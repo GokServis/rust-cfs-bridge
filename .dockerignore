@@ -1,7 +1,6 @@
 **/.git
 **/.gitignore
 **/.dockerignore
-LICENSE
 README.md
 
 # Only Rust's output dir; do not use **/target/ (excludes cfs/cfe/cmake/target).

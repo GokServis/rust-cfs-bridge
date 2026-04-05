@@ -39,4 +39,6 @@ For live-mounted source trees, use [docker-compose.dev.yml](docker-compose.dev.y
 
 ## License
 
-See [LICENSE](LICENSE) if present; cFS and submodule licenses apply to their respective trees.
+Original files in this repository (for example Docker assets, Compose files, `rust-bridge/`, and documentation) are licensed under the [Apache License 2.0](LICENSE).
+
+The `cfs/` git submodule is third-party software; see [cfs/LICENSE](cfs/LICENSE) and the license files in submodule components for their terms.
