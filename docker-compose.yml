@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  space-bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: rust-cfs-bridge
+    network_mode: "host"
+    stdin_open: true
+    tty: true

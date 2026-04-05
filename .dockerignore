@@ -4,7 +4,8 @@
 LICENSE
 README.md
 
-**/target/
+# Only Rust's output dir; do not use **/target/ (excludes cfs/cfe/cmake/target).
+rust-bridge/target/
 **/*.rs.bk
 rust-toolchain
 rust-toolchain.toml
