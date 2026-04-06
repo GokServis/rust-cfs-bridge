@@ -6,9 +6,12 @@
 
 mod udp;
 
+#[cfg(feature = "server")]
+pub mod server;
+
 pub use udp::UdpSender;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // --- Mission ID mapping (cFS Software Bus vs CCSDS wire) ---
@@ -56,6 +59,46 @@ impl BridgeCommandSpec {
             }
         }
     }
+}
+
+/// User-facing metadata for a named dictionary command (mirrors [`BridgeCommandSpec`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CommandMetadata {
+    pub name: &'static str,
+    pub title: &'static str,
+    pub description: &'static str,
+    pub wire_apid: u16,
+    pub software_bus_msg_id: u16,
+    pub payload: PayloadConstraintJson,
+}
+
+/// JSON-friendly payload size rule for forms and client-side checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PayloadConstraintJson {
+    Exact { bytes: usize },
+    Range { min: usize, max: usize },
+}
+
+impl PayloadConstraintJson {
+    fn from_rule(rule: PayloadLenRule) -> Self {
+        match rule {
+            PayloadLenRule::Exact(n) => PayloadConstraintJson::Exact { bytes: n },
+            PayloadLenRule::Range { min, max } => PayloadConstraintJson::Range { min, max },
+        }
+    }
+}
+
+/// Entries for the HTTP `GET /api/commands` response and for the UI dictionary.
+pub fn command_dictionary_entries() -> Vec<CommandMetadata> {
+    vec![CommandMetadata {
+        name: "CMD_HEARTBEAT",
+        title: "Heartbeat",
+        description: "Sample telecommand to validate the bridge. The UDP datagram uses CCSDS APID 0x006 on the wire; CI_LAB then publishes a Software Bus message with MsgId 0x18F0 (different roles, not the same field).",
+        wire_apid: BRIDGE_WIRE_APID,
+        software_bus_msg_id: BRIDGE_SB_MSGID_VALUE,
+        payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_HEARTBEAT.payload_len),
+    }]
 }
 
 /// Resolves a command name to a [`SpaceCommand`] using the static dictionary.
@@ -663,5 +706,11 @@ mod tests {
         let cmd = SpaceCommand::from_json(j).unwrap();
         assert_eq!(cmd.sequence_count, 1);
         assert_eq!(cmd.payload, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn command_dictionary_entries_includes_heartbeat() {
+        let e = command_dictionary_entries();
+        assert!(e.iter().any(|c| c.name == "CMD_HEARTBEAT"));
     }
 }

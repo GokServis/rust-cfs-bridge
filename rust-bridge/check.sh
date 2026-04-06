@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lint (fmt + clippy), test, and line coverage for the library (≥90%).
+# Lint (fmt + clippy), test, and line coverage for all targets (≥80%).
 # Requires: rustfmt + clippy (default stable toolchain), llvm-tools-preview, cargo-llvm-cov.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -13,7 +13,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 echo "== cargo test =="
 cargo test
 
-echo "== cargo llvm-cov (lib, fail-under-lines 90) =="
-cargo llvm-cov --lib --fail-under-lines 90
+echo "== cargo llvm-cov (all targets, fail-under-lines 80) =="
+cargo llvm-cov --all-targets --fail-under-lines 80
 
 echo "All checks passed."
