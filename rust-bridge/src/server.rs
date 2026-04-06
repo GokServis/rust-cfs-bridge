@@ -7,7 +7,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, get_service, post};
 use axum::Json;
 use axum::Router;
 use serde::Serialize;
@@ -129,8 +129,13 @@ pub fn build_app(
 
     if let Some(root) = static_dir {
         let index = format!("{}/index.html", root.trim_end_matches('/'));
-        let static_svc = ServeDir::new(root).not_found_service(ServeFile::new(index));
-        app = app.fallback_service(static_svc);
+        let static_svc = ServeDir::new(root).not_found_service(ServeFile::new(index.clone()));
+        /* Explicit HTML routes: `fallback_service` + `ServeDir` alone did not serve `index.html`
+         * for `/` or `/telemetry` in this Axum/tower-http combination. */
+        app = app
+            .route_service("/", get_service(ServeFile::new(index.clone())))
+            .route_service("/telemetry", get_service(ServeFile::new(index.clone())))
+            .fallback_service(static_svc);
     }
     app
 }
@@ -196,9 +201,10 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).expect("json");
         let arr = v.as_array().expect("array");
-        assert_eq!(arr.len(), 2);
+        assert_eq!(arr.len(), 3);
         assert_eq!(arr[0]["name"], "CMD_HEARTBEAT");
         assert!(arr.iter().any(|e| e["name"] == "CMD_PING"));
+        assert!(arr.iter().any(|e| e["name"] == "CMD_TO_LAB_ENABLE_OUTPUT"));
     }
 
     #[tokio::test]
@@ -237,6 +243,41 @@ mod tests {
         let wire = handle.join().expect("thread");
         assert!(!wire.is_empty());
         assert_eq!(wire.len(), 11);
+    }
+
+    #[tokio::test]
+    async fn get_telemetry_serves_spa_index_when_static_dir_set() {
+        let dir = std::env::temp_dir().join(format!("rb_spa_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("index.html"),
+            "<!doctype html><html><body>spa</body></html>",
+        )
+        .unwrap();
+
+        let recv = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let sender = UdpSender::connect(&recv.local_addr().unwrap().to_string()).unwrap();
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, Some(dir.to_str().unwrap()));
+
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/telemetry")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let s = String::from_utf8_lossy(&body);
+        assert!(
+            s.contains("spa"),
+            "expected index.html body for /telemetry, got {s:?}"
+        );
     }
 
     #[tokio::test]

@@ -54,4 +54,21 @@ describe('TelemetryOverview', () => {
     expect(screen.getByText('7.8.9.0')).toBeInTheDocument()
     expect(screen.getByText(/10 \/ 2/)).toBeInTheDocument()
   })
+
+  it('renders TO_LAB HK when message present', () => {
+    const store = new TelemetryStore()
+    store.connected = true
+    store.packetCount = 1
+    store.lastMessage = {
+      kind: 'to_lab_hk_v1',
+      received_at: '2026-04-06T12:00:00.000Z',
+      raw_len: 22,
+      primary: { apid: 0, packet_type: 0, sequence_count: 0 },
+      to_lab_hk: { command_counter: 9, command_error_counter: 2 },
+    }
+    render(<TelemetryOverview store={store} />)
+    expect(screen.getByRole('heading', { name: 'TO_LAB HK' })).toBeInTheDocument()
+    expect(screen.getByText('9')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+  })
 })

@@ -2,6 +2,7 @@
 
 pub mod cfe_primary;
 pub mod es_hk;
+pub mod to_lab_hk;
 
 #[cfg(feature = "server")]
 pub mod udp_task;
@@ -10,6 +11,7 @@ use serde::Serialize;
 
 use crate::tlm::cfe_primary::CcsdsPrimaryHeader;
 use crate::tlm::es_hk::{parse_es_hk_datagram, EsHkV1};
+use crate::tlm::to_lab_hk::{parse_to_lab_hk_datagram, ToLabHkV1};
 
 /// Wire JSON for WebSocket clients (`kind` discriminates schema).
 #[derive(Debug, Clone, Serialize)]
@@ -20,6 +22,12 @@ pub enum TlmEvent {
         raw_len: usize,
         primary: CcsdsPrimarySummary,
         es_hk: EsHkV1,
+    },
+    ToLabHkV1 {
+        received_at: String,
+        raw_len: usize,
+        primary: CcsdsPrimarySummary,
+        to_lab_hk: ToLabHkV1,
     },
     ParseError {
         received_at: String,
@@ -80,11 +88,25 @@ pub fn classify_datagram(data: &[u8], received_at: String) -> TlmEvent {
         };
     }
 
+    if let Some(hk) = parse_to_lab_hk_datagram(data) {
+        let primary = primary_summary.unwrap_or(CcsdsPrimarySummary {
+            apid: 0,
+            packet_type: 0,
+            sequence_count: 0,
+        });
+        return TlmEvent::ToLabHkV1 {
+            received_at,
+            raw_len,
+            primary,
+            to_lab_hk: hk,
+        };
+    }
+
     TlmEvent::ParseError {
         received_at,
         raw_len,
         primary: primary_summary,
-        message: "not a recognized ES HK datagram (expected 12 + 168 bytes for ES HK v1)".into(),
+        message: "not a recognized ES HK or TO_LAB HK datagram".into(),
         hex_preview: hex_preview(data),
     }
 }
@@ -124,6 +146,7 @@ mod tests {
         let ev = classify_datagram(&d, "test".into());
         match ev {
             TlmEvent::EsHkV1 { es_hk, .. } => assert_eq!(es_hk.command_counter, 0xAB),
+            TlmEvent::ToLabHkV1 { .. } => panic!("unexpected TO_LAB HK"),
             TlmEvent::ParseError { message, .. } => panic!("unexpected error: {message}"),
         }
     }
@@ -138,7 +161,7 @@ mod tests {
         let ev = classify_datagram(&d, "t".into());
         match ev {
             TlmEvent::ParseError { message, .. } => assert!(message.contains("length mismatch")),
-            TlmEvent::EsHkV1 { .. } => panic!("expected parse_error"),
+            TlmEvent::EsHkV1 { .. } | TlmEvent::ToLabHkV1 { .. } => panic!("expected parse_error"),
         }
     }
 

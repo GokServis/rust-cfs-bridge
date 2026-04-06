@@ -8,6 +8,7 @@ import { StatusBadge } from '../ui/StatusBadge'
 
 import { EsHkPanel } from './EsHkPanel'
 import { ParseErrorPanel } from './ParseErrorPanel'
+import { ToLabHkPanel } from './ToLabHkPanel'
 import { StaleWarning } from './StaleWarning'
 
 import './TelemetryOverview.css'
@@ -69,6 +70,11 @@ export const TelemetryOverview = observer(function TelemetryOverview({
       {msg?.kind === 'es_hk_v1' ? (
         <Panel title="ES HK" className="telemetry-grid">
           <EsHkPanel msg={msg} />
+        </Panel>
+      ) : null}
+      {msg?.kind === 'to_lab_hk_v1' ? (
+        <Panel title="TO_LAB HK" className="telemetry-grid">
+          <ToLabHkPanel msg={msg} />
         </Panel>
       ) : null}
       {msg?.kind === 'parse_error' ? <ParseErrorPanel msg={msg} /> : null}

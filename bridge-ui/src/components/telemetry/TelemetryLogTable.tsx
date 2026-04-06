@@ -32,12 +32,15 @@ export const TelemetryLogTable = observer(function TelemetryLogTable({
           <select
             value={kindFilter}
             onChange={(e) =>
-              store.setKindFilter(e.target.value as 'all' | 'es_hk_v1' | 'parse_error')
+              store.setKindFilter(
+                e.target.value as 'all' | 'es_hk_v1' | 'to_lab_hk_v1' | 'parse_error',
+              )
             }
             aria-label="Filter by packet kind"
           >
             <option value="all">All</option>
             <option value="es_hk_v1">es_hk_v1</option>
+            <option value="to_lab_hk_v1">to_lab_hk_v1</option>
             <option value="parse_error">parse_error</option>
           </select>
         </label>

@@ -34,6 +34,11 @@ export interface EsHkPayload {
   heap_max_block_size: number
 }
 
+export interface ToLabHkPayload {
+  command_counter: number
+  command_error_counter: number
+}
+
 export type TlmMessage =
   | {
       kind: 'es_hk_v1'
@@ -41,6 +46,13 @@ export type TlmMessage =
       raw_len: number
       primary: EsHkPrimary
       es_hk: EsHkPayload
+    }
+  | {
+      kind: 'to_lab_hk_v1'
+      received_at: string
+      raw_len: number
+      primary: EsHkPrimary
+      to_lab_hk: ToLabHkPayload
     }
   | {
       kind: 'parse_error'

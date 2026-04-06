@@ -44,6 +44,14 @@ const esMsg = {
   },
 }
 
+const toLabMsg = {
+  kind: 'to_lab_hk_v1' as const,
+  received_at: '2026-01-01T00:00:00Z',
+  raw_len: 22,
+  primary: { apid: 0, packet_type: 0, sequence_count: 0 },
+  to_lab_hk: { command_counter: 3, command_error_counter: 1 },
+}
+
 const parseErr = {
   kind: 'parse_error' as const,
   received_at: '2026-01-02T00:00:00Z',
@@ -56,6 +64,7 @@ const parseErr = {
 describe('telemetryFiltering', () => {
   it('apidOf reads primary', () => {
     expect(apidOf(esMsg)).toBe(7)
+    expect(apidOf(toLabMsg)).toBe(0)
     expect(apidOf(parseErr)).toBe(9)
   })
 
@@ -68,11 +77,13 @@ describe('telemetryFiltering', () => {
   it('filterEntries by kind', () => {
     const entries: TlmEntry[] = [
       { seq: 1, message: esMsg },
-      { seq: 2, message: parseErr },
+      { seq: 2, message: toLabMsg },
+      { seq: 3, message: parseErr },
     ]
     expect(filterEntries(entries, 'es_hk_v1', '', '').length).toBe(1)
+    expect(filterEntries(entries, 'to_lab_hk_v1', '', '').length).toBe(1)
     expect(filterEntries(entries, 'parse_error', '', '').length).toBe(1)
-    expect(filterEntries(entries, 'all', '', '').length).toBe(2)
+    expect(filterEntries(entries, 'all', '', '').length).toBe(3)
   })
 
   it('filterEntries by apid', () => {
@@ -94,6 +105,7 @@ describe('telemetryFiltering', () => {
 
   it('summaryLine covers kinds', () => {
     expect(summaryLine(esMsg)).toContain('ES HK')
+    expect(summaryLine(toLabMsg)).toContain('TO_LAB HK')
     expect(summaryLine(parseErr)).toBe('bad')
   })
 })
