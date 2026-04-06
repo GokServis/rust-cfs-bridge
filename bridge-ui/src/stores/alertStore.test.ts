@@ -142,4 +142,47 @@ describe('AlertStore', () => {
     })
     expect(store.alerts).toHaveLength(0)
   })
+
+  it('orders alertsNewestFirst by descending id', () => {
+    const store = new AlertStore()
+    store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, processor_resets: 1 } })
+    store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, processor_resets: 2 } })
+    expect(store.alerts).toHaveLength(2)
+    const [first] = store.alertsNewestFirst
+    expect(first.message).toMatch(/count: 2/i)
+  })
+
+  it('filteredAlerts respects severityFilter', () => {
+    const store = new AlertStore()
+    store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, heap_bytes_free: 50_000 } })
+    store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, processor_resets: 1 } })
+    store.setSeverityFilter('warn')
+    expect(store.filteredAlerts.every(a => a.severity === 'warn')).toBe(true)
+    store.setSeverityFilter('critical')
+    expect(store.filteredAlerts.every(a => a.severity === 'critical')).toBe(true)
+  })
+
+  it('setSeverityFilter resets alert page index', () => {
+    const store = new AlertStore()
+    for (let i = 0; i < 6; i++) {
+      store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, heap_bytes_free: 50_000 - i } })
+    }
+    store.setAlertPageSize(2)
+    store.nextAlertPage()
+    expect(store.effectiveAlertPageIndex).toBe(1)
+    store.setSeverityFilter('warn')
+    expect(store.alertPageIndex).toBe(0)
+  })
+
+  it('effectiveAlertPageIndex clamps when filtered list shrinks', () => {
+    const store = new AlertStore()
+    for (let i = 0; i < 4; i++) {
+      store.evaluate({ ...baseEsHk, es_hk: { ...baseEsHk.es_hk, heap_bytes_free: 50_000 - i } })
+    }
+    store.setAlertPageSize(2)
+    store.goToAlertPage(1)
+    expect(store.effectiveAlertPageIndex).toBe(1)
+    store.clearAll()
+    expect(store.effectiveAlertPageIndex).toBe(0)
+  })
 })

@@ -1,0 +1,98 @@
+.alert-feed__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.alert-feed__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+}
+
+.alert-feed__label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.alert-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+
+.alert-feed__card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.alert-feed__card--warn {
+  border-left: 3px solid var(--color-warn, #ff9800);
+}
+
+.alert-feed__card--error {
+  border-left: 3px solid var(--color-error, #f44336);
+}
+
+.alert-feed__card--critical {
+  border-left: 3px solid var(--color-critical, #9c27b0);
+}
+
+.alert-feed__severity {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.alert-feed__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-feed__time {
+  display: block;
+  font-size: 0.72rem;
+  opacity: 0.65;
+  margin-top: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.alert-feed__empty {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: 0.85rem;
+  opacity: 0.55;
+  text-align: center;
+}
+
+.alert-feed__meta {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.alert-feed__pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.alert-feed__toolbar-spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}

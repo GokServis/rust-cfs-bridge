@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite'
 
 import type { AlertStore } from '../../stores/alertStore'
 import type { TelemetryStore } from '../../stores/telemetryStore'
+import { AlertFeedPanel } from './AlertFeedPanel'
 import { Panel } from '../ui/Panel'
 import { StatusBadge } from '../ui/StatusBadge'
 
@@ -38,7 +39,9 @@ export const HealthDashboard = observer(function HealthDashboard({
   const dash = '—'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <AlertFeedPanel store={alerts} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
 
       <Panel title="Flight Computer Status">
         <Row label="Processor resets" value={hk ? hk.processor_resets : dash} />
@@ -122,6 +125,7 @@ export const HealthDashboard = observer(function HealthDashboard({
         <Row label="Active alerts" value={alerts.alerts.length} />
       </Panel>
 
+      </div>
     </div>
   )
 })

@@ -44,6 +44,8 @@ describe('HealthDashboard', () => {
     const telemetry = new TelemetryStore()
     const alerts = new AlertStore()
     render(<HealthDashboard telemetry={telemetry} alerts={alerts} />)
+    expect(screen.getByRole('heading', { name: /^alerts$/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/filter alerts by severity/i)).toBeInTheDocument()
     expect(screen.getByText(/flight computer/i)).toBeInTheDocument()
     expect(screen.getByText(/memory/i)).toBeInTheDocument()
     expect(screen.getByText(/syslog/i)).toBeInTheDocument()

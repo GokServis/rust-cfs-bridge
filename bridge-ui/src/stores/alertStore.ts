@@ -1,8 +1,11 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 
 import type { TlmMessage } from '../telemetryTypes'
+import { pageSlice, totalPageCount } from '../telemetryFiltering'
 
 export type AlertSeverity = 'warn' | 'error' | 'critical'
+
+export type AlertSeverityFilter = 'all' | AlertSeverity
 
 export interface Alert {
   id: number
@@ -14,10 +17,16 @@ export interface Alert {
 /** Minimum free heap bytes before a WARN alert fires. */
 const HEAP_WARN_THRESHOLD = 128 * 1024
 
+export const DEFAULT_ALERT_PAGE_SIZE = 7
+
 let nextId = 1
 
 export class AlertStore {
   alerts: Alert[] = []
+
+  severityFilter: AlertSeverityFilter = 'all'
+  alertPageSize = DEFAULT_ALERT_PAGE_SIZE
+  alertPageIndex = 0
 
   private lastEsErrorCount = 0
   private lastProcessorResets = 0
@@ -25,6 +34,28 @@ export class AlertStore {
 
   constructor() {
     makeAutoObservable(this)
+  }
+
+  /** Newest-first (higher `id` = more recently created). */
+  get alertsNewestFirst(): Alert[] {
+    return [...this.alerts].sort((a, b) => b.id - a.id)
+  }
+
+  get filteredAlerts(): Alert[] {
+    if (this.severityFilter === 'all') return this.alertsNewestFirst
+    return this.alertsNewestFirst.filter(a => a.severity === this.severityFilter)
+  }
+
+  get alertTotalPages(): number {
+    return totalPageCount(this.filteredAlerts.length, this.alertPageSize)
+  }
+
+  get effectiveAlertPageIndex(): number {
+    return Math.min(this.alertPageIndex, Math.max(0, this.alertTotalPages - 1))
+  }
+
+  get pagedAlerts(): Alert[] {
+    return pageSlice(this.filteredAlerts, this.alertPageSize, this.effectiveAlertPageIndex)
   }
 
   evaluate(msg: TlmMessage): void {
@@ -68,7 +99,37 @@ export class AlertStore {
   clearAll(): void {
     runInAction(() => {
       this.alerts = []
+      this.alertPageIndex = 0
     })
+  }
+
+  setSeverityFilter(filter: AlertSeverityFilter): void {
+    runInAction(() => {
+      this.severityFilter = filter
+      this.alertPageIndex = 0
+    })
+  }
+
+  setAlertPageSize(size: number): void {
+    runInAction(() => {
+      this.alertPageSize = Math.max(1, Math.min(50, Math.floor(size)))
+      this.alertPageIndex = 0
+    })
+  }
+
+  goToAlertPage(index: number): void {
+    runInAction(() => {
+      const max = Math.max(0, this.alertTotalPages - 1)
+      this.alertPageIndex = Math.min(Math.max(0, index), max)
+    })
+  }
+
+  nextAlertPage(): void {
+    this.goToAlertPage(this.effectiveAlertPageIndex + 1)
+  }
+
+  prevAlertPage(): void {
+    this.goToAlertPage(this.effectiveAlertPageIndex - 1)
   }
 
   private push(severity: AlertSeverity, message: string): void {
