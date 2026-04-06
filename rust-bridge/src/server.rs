@@ -18,7 +18,8 @@ use tower_http::services::{ServeDir, ServeFile};
 
 use crate::tlm::TlmEvent;
 use crate::{
-    command_dictionary_entries, command_dictionary_resolve, CcsdsPacket, CommandMetadata, SpaceCommand, UdpSender,
+    command_dictionary_entries, command_dictionary_resolve, CcsdsPacket, CommandMetadata,
+    SpaceCommand, UdpSender,
 };
 
 /// Shared HTTP state (UDP sender to CI_LAB).
@@ -102,10 +103,13 @@ async fn send_json(
     }))
 }
 
-async fn to_lab_output_enable(State(state): State<Arc<AppState>>) -> Result<Json<SendResponse>, ApiError> {
+async fn to_lab_output_enable(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<SendResponse>, ApiError> {
     let cmd = command_dictionary_resolve("CMD_TO_LAB_ENABLE_OUTPUT", 0, None)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    let packet = CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let packet =
+        CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
     let n = guard
@@ -117,10 +121,13 @@ async fn to_lab_output_enable(State(state): State<Arc<AppState>>) -> Result<Json
     }))
 }
 
-async fn to_lab_output_disable(State(state): State<Arc<AppState>>) -> Result<Json<SendResponse>, ApiError> {
+async fn to_lab_output_disable(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<SendResponse>, ApiError> {
     let cmd = command_dictionary_resolve("CMD_TO_LAB_DISABLE_OUTPUT", 0, None)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    let packet = CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let packet =
+        CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
     let n = guard

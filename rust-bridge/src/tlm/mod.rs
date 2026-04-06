@@ -1,8 +1,8 @@
 //! Telemetry ingestion: CCSDS primary header + CFE ES HK payload parsing (Linux LE).
 
 pub mod cfe_primary;
-pub mod evs_long_event;
 pub mod es_hk;
+pub mod evs_long_event;
 pub mod to_lab_hk;
 
 #[cfg(feature = "server")]
@@ -11,8 +11,8 @@ pub mod udp_task;
 use serde::Serialize;
 
 use crate::tlm::cfe_primary::CcsdsPrimaryHeader;
-use crate::tlm::evs_long_event::{parse_evs_long_event_datagram, EvsLongEventV1};
 use crate::tlm::es_hk::{parse_es_hk_datagram, EsHkV1};
+use crate::tlm::evs_long_event::{parse_evs_long_event_datagram, EvsLongEventV1};
 use crate::tlm::to_lab_hk::{parse_to_lab_hk_datagram, ToLabHkV1};
 
 /// Wire JSON for WebSocket clients (`kind` discriminates schema).
@@ -184,7 +184,9 @@ mod tests {
         let ev = classify_datagram(&d, "t".into());
         match ev {
             TlmEvent::ParseError { message, .. } => assert!(message.contains("length mismatch")),
-            TlmEvent::EsHkV1 { .. } | TlmEvent::ToLabHkV1 { .. } | TlmEvent::EvsLongEventV1 { .. } => {
+            TlmEvent::EsHkV1 { .. }
+            | TlmEvent::ToLabHkV1 { .. }
+            | TlmEvent::EvsLongEventV1 { .. } => {
                 panic!("expected parse_error")
             }
         }

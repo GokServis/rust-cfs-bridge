@@ -41,9 +41,7 @@ fn looks_like_printable_ascii(bytes: &[u8]) -> bool {
     if end == 0 {
         return false;
     }
-    bytes[..end]
-        .iter()
-        .all(|&b| (0x20..=0x7Eu8).contains(&b))
+    bytes[..end].iter().all(|&b| (0x20..=0x7Eu8).contains(&b))
 }
 
 /// Parses a full UDP datagram when it carries an EVS LONG_EVENT_MSG payload.
@@ -64,7 +62,8 @@ pub fn parse_evs_long_event_datagram(data: &[u8]) -> Option<EvsLongEventV1> {
     } else {
         return None;
     };
-    let legacy_match = ph.apid == EVS_LONG_EVENT_APID_LEGACY && msg_id == EVS_LONG_EVENT_MSGID_LE_LEGACY;
+    let legacy_match =
+        ph.apid == EVS_LONG_EVENT_APID_LEGACY && msg_id == EVS_LONG_EVENT_MSGID_LE_LEGACY;
 
     let need = CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
     if data.len() < need {
@@ -113,7 +112,8 @@ mod tests {
     #[test]
     fn parse_synthetic_legacy_packet() {
         // Build a synthetic packet: CCSDS primary (APID 9), MsgId LE 0x0809, 8-byte time, then payload.
-        let total = CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
+        let total =
+            CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
         let user = (total - 6) as u16;
         let w2 = user - 1;
         let mut d = vec![0u8; total];
@@ -147,4 +147,3 @@ mod tests {
         assert_eq!(ev.message, "hello world");
     }
 }
-
