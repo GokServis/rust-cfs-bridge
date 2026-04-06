@@ -15,17 +15,27 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // --- Mission ID mapping (cFS Software Bus vs CCSDS wire) ---
-/// cFS Software Bus MsgId for bridge packets (subscription / CI_LAB forward). **Not** placed in the CCSDS APID field.
-/// Must not use `0x1806` — that is `CFE_ES_CMD_MID` on default missions; use a free CMD topic (e.g. `0x18F0`).
-pub const BRIDGE_SB_MSGID_VALUE: u16 = 0x18F0;
-/// On-wire CCSDS primary-header APID (11 bits) for bridge dictionary commands.
-pub const BRIDGE_WIRE_APID: u16 = 0x006;
+// Keep numeric values in sync with `cfs/apps/bridge_reader/fsw/inc/bridge_reader_mission_ids.h`.
+/// Heartbeat: Software Bus MsgId (CI_LAB routing). **Not** placed in the CCSDS APID field.
+pub const BRIDGE_SB_MSGID_HEARTBEAT: u16 = 0x18F0;
+/// Second dictionary command: SB MsgId for wire APID [`BRIDGE_WIRE_APID_PING`].
+pub const BRIDGE_SB_MSGID_PING: u16 = 0x18F1;
+/// Legacy alias: first bridge SB MsgId (`CMD_HEARTBEAT`).
+pub const BRIDGE_SB_MSGID_VALUE: u16 = BRIDGE_SB_MSGID_HEARTBEAT;
 
-/// Human-readable command name → payload rules and fixed wire APID.
+/// On-wire CCSDS APID for `CMD_HEARTBEAT` (11 bits).
+pub const BRIDGE_WIRE_APID_HEARTBEAT: u16 = 0x006;
+/// On-wire CCSDS APID for `CMD_PING`.
+pub const BRIDGE_WIRE_APID_PING: u16 = 0x007;
+/// Legacy alias: same as [`BRIDGE_WIRE_APID_HEARTBEAT`].
+pub const BRIDGE_WIRE_APID: u16 = BRIDGE_WIRE_APID_HEARTBEAT;
+
+/// Human-readable command name → payload rules, wire APID, and matching SB MsgId (CI_LAB maps APID → MsgId).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BridgeCommandSpec {
-    /// Always [`BRIDGE_WIRE_APID`] for current dictionary entries.
     pub wire_apid: u16,
+    /// cFS Software Bus MsgId for this command; must match C headers for the same `wire_apid`.
+    pub software_bus_msg_id: u16,
     pub default_payload: &'static [u8],
     pub payload_len: PayloadLenRule,
 }
@@ -40,8 +50,17 @@ pub enum PayloadLenRule {
 impl BridgeCommandSpec {
     /// Built-in dictionary: heartbeat telecommand (3-byte payload, 11-byte wire with CRC).
     pub const CMD_HEARTBEAT: Self = Self {
-        wire_apid: BRIDGE_WIRE_APID,
+        wire_apid: BRIDGE_WIRE_APID_HEARTBEAT,
+        software_bus_msg_id: BRIDGE_SB_MSGID_HEARTBEAT,
         default_payload: &[0xC0, 0xFF, 0xEE],
+        payload_len: PayloadLenRule::Exact(3),
+    };
+
+    /// Sample second telecommand (3-byte payload); distinct APID / MsgId from heartbeat.
+    pub const CMD_PING: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_PING,
+        software_bus_msg_id: BRIDGE_SB_MSGID_PING,
+        default_payload: &[0x50, 0x49, 0x4E],
         payload_len: PayloadLenRule::Exact(3),
     };
 
@@ -91,14 +110,24 @@ impl PayloadConstraintJson {
 
 /// Entries for the HTTP `GET /api/commands` response and for the UI dictionary.
 pub fn command_dictionary_entries() -> Vec<CommandMetadata> {
-    vec![CommandMetadata {
-        name: "CMD_HEARTBEAT",
-        title: "Heartbeat",
-        description: "Sample telecommand to validate the bridge. The UDP datagram uses CCSDS APID 0x006 on the wire; CI_LAB then publishes a Software Bus message with MsgId 0x18F0 (different roles, not the same field).",
-        wire_apid: BRIDGE_WIRE_APID,
-        software_bus_msg_id: BRIDGE_SB_MSGID_VALUE,
-        payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_HEARTBEAT.payload_len),
-    }]
+    vec![
+        CommandMetadata {
+            name: "CMD_HEARTBEAT",
+            title: "Heartbeat",
+            description: "Sample telecommand to validate the bridge. On-wire CCSDS APID 0x006; CI_LAB publishes SB MsgId 0x18F0 (APID and MsgId are different fields).",
+            wire_apid: BridgeCommandSpec::CMD_HEARTBEAT.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_HEARTBEAT.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_HEARTBEAT.payload_len),
+        },
+        CommandMetadata {
+            name: "CMD_PING",
+            title: "Ping",
+            description: "Second dictionary command for multi-APID routing. On-wire APID 0x007; CI_LAB publishes SB MsgId 0x18F1.",
+            wire_apid: BridgeCommandSpec::CMD_PING.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_PING.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_PING.payload_len),
+        },
+    ]
 }
 
 /// Resolves a command name to a [`SpaceCommand`] using the static dictionary.
@@ -109,6 +138,7 @@ pub fn command_dictionary_resolve(
 ) -> Result<SpaceCommand, BridgeError> {
     let spec = match name {
         "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
+        "CMD_PING" => BridgeCommandSpec::CMD_PING,
         _ => return Err(BridgeError::UnknownCommand(name.to_string())),
     };
 
@@ -658,9 +688,31 @@ mod tests {
     }
 
     #[test]
+    fn dictionary_specs_match_bridge_reader_mission_ids_h() {
+        assert_eq!(BridgeCommandSpec::CMD_HEARTBEAT.wire_apid, 0x006);
+        assert_eq!(BridgeCommandSpec::CMD_HEARTBEAT.software_bus_msg_id, 0x18F0);
+        assert_eq!(BridgeCommandSpec::CMD_PING.wire_apid, 0x007);
+        assert_eq!(BridgeCommandSpec::CMD_PING.software_bus_msg_id, 0x18F1);
+    }
+
+    #[test]
+    fn command_metadata_matches_dictionary_resolve() {
+        for meta in command_dictionary_entries() {
+            let cmd = command_dictionary_resolve(meta.name, 0, None).unwrap();
+            assert_eq!(cmd.apid, meta.wire_apid);
+            let spec = match meta.name {
+                "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
+                "CMD_PING" => BridgeCommandSpec::CMD_PING,
+                _ => panic!("unexpected dictionary name {}", meta.name),
+            };
+            assert_eq!(meta.software_bus_msg_id, spec.software_bus_msg_id);
+        }
+    }
+
+    #[test]
     fn dictionary_cmd_heartbeat_maps_to_wire_apid_and_crc() {
         let cmd = command_dictionary_resolve("CMD_HEARTBEAT", 0, None).unwrap();
-        assert_eq!(cmd.apid, BRIDGE_WIRE_APID);
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID_HEARTBEAT);
         assert_eq!(cmd.payload, vec![0xC0, 0xFF, 0xEE]);
         let pkt = CcsdsPacket::from_command(&cmd).unwrap();
         let wire = pkt.to_bytes();
@@ -671,13 +723,23 @@ mod tests {
 
     #[test]
     fn sb_msgid_constant_is_not_ccsds_apid_on_wire() {
-        // BRIDGE_SB_MSGID_VALUE is the cFS SB MsgId; the CCSDS header carries only 11-bit APID (here 0x006).
+        // SB MsgId is separate from the 11-bit CCSDS APID on the wire.
         let cmd = command_dictionary_resolve("CMD_HEARTBEAT", 0, None).unwrap();
         let pkt = CcsdsPacket::from_command(&cmd).unwrap();
         let w0 = u16::from_be_bytes([pkt.primary_header_bytes()[0], pkt.primary_header_bytes()[1]]);
         let apid_on_wire = w0 & 0x7FF;
         assert_eq!(apid_on_wire, 0x006);
-        assert_ne!(apid_on_wire as u32, BRIDGE_SB_MSGID_VALUE as u32);
+        assert_ne!(apid_on_wire as u32, BRIDGE_SB_MSGID_HEARTBEAT as u32);
+    }
+
+    #[test]
+    fn dictionary_cmd_ping_maps_to_distinct_apid() {
+        let cmd = command_dictionary_resolve("CMD_PING", 0, None).unwrap();
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID_PING);
+        assert_eq!(cmd.payload, vec![0x50, 0x49, 0x4E]);
+        let pkt = CcsdsPacket::from_command(&cmd).unwrap();
+        let w0 = u16::from_be_bytes([pkt.primary_header_bytes()[0], pkt.primary_header_bytes()[1]]);
+        assert_eq!(w0 & 0x7FF, BRIDGE_WIRE_APID_PING);
     }
 
     #[test]
@@ -696,8 +758,16 @@ mod tests {
     fn json_named_command_parses() {
         let j = r#"{"command":"CMD_HEARTBEAT","sequence_count":0}"#;
         let cmd = SpaceCommand::from_json(j).unwrap();
-        assert_eq!(cmd.apid, BRIDGE_WIRE_APID);
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID_HEARTBEAT);
         assert_eq!(cmd.payload, vec![0xC0, 0xFF, 0xEE]);
+    }
+
+    #[test]
+    fn json_named_command_parses_ping() {
+        let j = r#"{"command":"CMD_PING","sequence_count":0}"#;
+        let cmd = SpaceCommand::from_json(j).unwrap();
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID_PING);
+        assert_eq!(cmd.payload, vec![0x50, 0x49, 0x4E]);
     }
 
     #[test]
@@ -709,8 +779,10 @@ mod tests {
     }
 
     #[test]
-    fn command_dictionary_entries_includes_heartbeat() {
+    fn command_dictionary_entries_includes_heartbeat_and_ping() {
         let e = command_dictionary_entries();
+        assert_eq!(e.len(), 2);
         assert!(e.iter().any(|c| c.name == "CMD_HEARTBEAT"));
+        assert!(e.iter().any(|c| c.name == "CMD_PING"));
     }
 }

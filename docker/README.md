@@ -42,3 +42,16 @@ From the repository root:
 ```bash
 docker build -f docker/Dockerfile -t rust-cfs-bridge:local .
 ```
+
+## Logs and verification
+
+After `docker compose up`, use `docker compose logs -f` (or read `/app/cfs-cpu1.log` inside the container) and look for:
+
+| Component | What to expect |
+|-----------|----------------|
+| **core-cpu1** | cFS boots; **BRIDGE_READER** prints `Initialized … subscribed to 2 bridge MsgId(s): 0x18F0 0x18F1` (two Software Bus topics for the bridge dictionary). |
+| **CI_LAB** | No repeated ingest errors when sending commands from the UI. |
+| **bridge-server** | HTTP access to `/api/commands` and successful `POST /api/send` (returns `bytes_sent` / `wire_length`). |
+| **BRIDGE_READER** | For each sent packet: `Bridge Reader: SB MsgId 0xXXXX wire APID 0xYYY payload: [ … ]` — **CMD_HEARTBEAT** uses MsgId `0x18F0` and wire APID `0x006`; **CMD_PING** uses MsgId `0x18F1` and wire APID `0x007`. |
+
+Manual check: open **http://127.0.0.1:8080**, confirm two commands in the dropdown, send each and match the MsgId/APID lines above.

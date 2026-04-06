@@ -19,6 +19,11 @@ describe('buildNamedCommandJson', () => {
       payload: 'aabbcc',
     })
   })
+
+  it('builds JSON for CMD_PING', () => {
+    const j = buildNamedCommandJson('CMD_PING', 0, '')
+    expect(j).toBe('{"command":"CMD_PING","sequence_count":0}')
+  })
 })
 
 describe('fetchCommands', () => {
