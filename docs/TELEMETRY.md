@@ -69,6 +69,7 @@ Confirm **bridge_reader** lines in `docker compose logs` or `/app/cfs-cpu1.log` 
 |--------|--------|
 | UI shows “Disconnected” for telemetry | WebSocket blocked; ensure dev proxy has `ws: true` for `/api`. Same origin as HTTP. |
 | No UDP packets | Firewall; wrong `BRIDGE_TLM_BIND`; TO_LAB not sending (expected until configured). |
+| TO_LAB sends to wrong UDP port | Default mission **`TO_LAB_MISSION_TLM_PORT`** is often **2234** while `BRIDGE_TLM_BIND` defaults to **5001** — align port (mission config, bridge env, or `dest_IP` with port if your OSAL supports it). |
 | `parse_error` only | Datagram size/layout differs from ES HK v1 (12 + 168 bytes LE); compare mission headers. |
 | Logs | On start: `telemetry UDP listening on ...` from `bridge-server`. |
 

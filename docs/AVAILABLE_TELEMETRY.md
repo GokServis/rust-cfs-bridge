@@ -124,9 +124,10 @@ The ground server does **not** automatically know every cFS product. Current beh
 | On-wire | JSON `kind` (`TlmEvent`) | Notes |
 |---------|---------------------------|--------|
 | CCSDS primary + **CFE ES HK** payload (LE 168-byte body after header) | `es_hk_v1` | Matches `rust-bridge/src/tlm/es_hk.rs` and `classify_datagram` in [`rust-bridge/src/tlm/mod.rs`](../rust-bridge/src/tlm/mod.rs). |
+| **TO_LAB HK** TLM (MsgId `0x0880` LE at bytes 6–7; HK payload after 12-byte prefix) | `to_lab_hk_v1` | [`rust-bridge/src/tlm/to_lab_hk.rs`](../rust-bridge/src/tlm/to_lab_hk.rs) — confirm against a live capture if EDS layout differs. |
 | Anything else | `parse_error` | Includes `hex_preview` and optional primary header summary. |
 
-So **EVS event messages**, **SB stats**, **TO_LAB HK** (different layout), **CI_LAB HK**, etc., require **additional parsers** and new `TlmEvent` variants (or a generic `raw_tlm` arm) to show structured fields in the UI.
+**EVS event messages**, **SB stats**, **CI_LAB HK**, and other products still need **additional parsers** when you enable them in TO_LAB.
 
 ---
 
