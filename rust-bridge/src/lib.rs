@@ -38,6 +38,9 @@ pub const TO_LAB_CMD_SB_MSGID: u16 = 0x1880;
 /// Legacy alias: same as [`BRIDGE_WIRE_APID_HEARTBEAT`].
 pub const BRIDGE_WIRE_APID: u16 = BRIDGE_WIRE_APID_HEARTBEAT;
 
+/// Default UDP bind for incoming telemetry. Align with cFS **`TO_LAB_MISSION_TLM_PORT`** (often **2234**) and `BRIDGE_TLM_BIND`.
+pub const BRIDGE_TLM_DEFAULT_BIND: &str = "127.0.0.1:2234";
+
 /// Default 16-byte `dest_IP` field for [`BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT`] (`127.0.0.1` NUL-padded).
 pub const CMD_TO_LAB_ENABLE_OUTPUT_DEFAULT_PAYLOAD: [u8; 16] = [
     b'1', b'2', b'7', b'.', b'0', b'.', b'0', b'.', b'1', 0, 0, 0, 0, 0, 0, 0,

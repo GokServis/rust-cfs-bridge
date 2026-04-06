@@ -3,7 +3,7 @@
 Send a synthetic CFE ES HK-sized UDP datagram to the bridge telemetry listener.
 
 Matches Linux little-endian layout used by rust-bridge `tlm::es_hk` (12-byte headers + 168-byte payload).
-Default target: 127.0.0.1:5001 (override with BRIDGE_TLM_BIND or argv).
+Default target: 127.0.0.1:2234 (override with BRIDGE_TLM_BIND or argv).
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def build_packet() -> bytes:
 
 
 def main() -> None:
-    target = os.environ.get("BRIDGE_TLM_BIND", "127.0.0.1:5001")
+    target = os.environ.get("BRIDGE_TLM_BIND", "127.0.0.1:2234")
     if len(sys.argv) >= 2:
         target = sys.argv[1]
     host, port_s = target.rsplit(":", 1)

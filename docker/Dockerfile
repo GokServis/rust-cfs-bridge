@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SIMULATION=native
 ENV OMIT_DEPRECATED=true
-ENV BRIDGE_TLM_BIND=127.0.0.1:5001
+ENV BRIDGE_TLM_BIND=127.0.0.1:2234
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -19,6 +19,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /app
 
 COPY . .
+
+# Upstream sch_lab ships an empty schedule table; HK must be requested for TO_LAB to forward es_hk_v1 / to_lab_hk_v1.
+RUN patch -d /app/cfs/apps/sch_lab -p1 < /app/docker/patches/sch_lab-hk-schedule.patch
 
 RUN chmod +x /app/docker/entrypoint.sh
 

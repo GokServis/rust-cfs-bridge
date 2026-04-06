@@ -145,8 +145,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let bind = std::env::var("BRIDGE_HTTP_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     let udp_target =
         std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
-    let tlm_bind =
-        std::env::var("BRIDGE_TLM_BIND").unwrap_or_else(|_| "127.0.0.1:5001".to_string());
+    let tlm_bind = std::env::var("BRIDGE_TLM_BIND")
+        .unwrap_or_else(|_| crate::BRIDGE_TLM_DEFAULT_BIND.to_string());
     let static_dir = std::env::var("BRIDGE_STATIC_DIR").ok();
 
     let sender = UdpSender::connect(&udp_target)?;

@@ -1,0 +1,46 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 024747e..0793d6c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4,4 +4,4 @@ project(CFS_SCH_LAB C)
+ add_cfe_app(sch_lab fsw/src/sch_lab_app.c)
+ add_cfe_tables(sch_lab fsw/tables/sch_lab_table.c)
+ 
+-target_include_directories(sch_lab PUBLIC fsw/inc)
++target_include_directories(sch_lab PUBLIC fsw/inc "${CMAKE_CURRENT_SOURCE_DIR}/../to_lab/fsw/inc")
+diff --git a/fsw/tables/sch_lab_table.c b/fsw/tables/sch_lab_table.c
+index c5cdbb3..6894f8e 100644
+--- a/fsw/tables/sch_lab_table.c
++++ b/fsw/tables/sch_lab_table.c
+@@ -22,6 +22,7 @@
+ 
+ /* This is for the standard set of CFE core app MsgID values */
+ #include "cfe_msgids.h"
++#include "to_lab_msgids.h"
+ 
+ /*
+ ** SCH Lab schedule table
+@@ -35,20 +36,10 @@
+ SCH_LAB_ScheduleTable_t Schedule = {
+     .TickRate = 100,
+     .Config   = {
+-        /*
+-        ** This is an empty default table.
+-        ** Projects should override this default table with their own configurations.
+-        ** Examples of cFE HK packet requests are shown in the comment below.
+-        */
+-        {CFE_SB_MSGID_RESERVED, 0, 0},
+-        /*
+-        ** Example of a cFE HK packet requests
++        /* rust-cfs-bridge: periodic HK requests so TO_LAB can forward es_hk_v1 / to_lab_hk_v1 on UDP. */
+         {CFE_SB_MSGID_WRAP_VALUE(CFE_ES_SEND_HK_MID), 100, 0},
+-        {CFE_SB_MSGID_WRAP_VALUE(CFE_TBL_SEND_HK_MID), 50, 0},
+-        {CFE_SB_MSGID_WRAP_VALUE(CFE_TIME_SEND_HK_MID), 98, 0},
+-        {CFE_SB_MSGID_WRAP_VALUE(CFE_SB_SEND_HK_MID), 97, 0},
+-        {CFE_SB_MSGID_WRAP_VALUE(CFE_EVS_SEND_HK_MID), 96, 0},
+-        */
++        {CFE_SB_MSGID_WRAP_VALUE(TO_LAB_SEND_HK_MID), 100, 0},
++        {CFE_SB_MSGID_RESERVED, 0, 0},
+     }
+ };
+ 

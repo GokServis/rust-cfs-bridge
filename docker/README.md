@@ -9,7 +9,7 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
 - **Base:** `ubuntu:22.04`
 - **Packages:** `build-essential`, `cmake`, `git`, `python3`, `curl`
 - **Rust:** installed with `rustup` (stable), on `PATH` as `/root/.cargo/bin`
-- **cFS:** in `/app/cfs`, copies `cfe/cmake/Makefile.sample` → `Makefile` and `sample_defs`, then:
+- **cFS:** in `/app/cfs`, applies **`docker/patches/sch_lab-hk-schedule.patch`** (SCH_LAB ES + TO_LAB **SEND_HK**), then copies `cfe/cmake/Makefile.sample` → `Makefile` and `sample_defs`, then:
   - `make BUILDTYPE=release prep`
   - `make` and `make install`
 - **Environment for cFS:** `SIMULATION=native` (host 64-bit GCC on amd64), `OMIT_DEPRECATED=true`
@@ -24,7 +24,7 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
 2. `cd /app/cfs/build/exe/cpu1`
 3. `./core-cpu1` in the background, with **stdout/stderr** copied to **`/app/cfs-cpu1.log`** via `tee` so logs are visible from `docker compose logs` as well as on disk in the container.
 4. **`sleep 2`** so CI_LAB and **bridge_reader** finish registration before the Rust bridge sends UDP.
-5. `exec /app/rust-bridge/target/release/bridge-server` in the foreground, with **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** and **`BRIDGE_TLM_BIND`** defaulting to **`127.0.0.1:5001`** (telemetry UDP) so the web UI is served on **http://127.0.0.1:8080** (API under **`/api`**, WebSocket **`/api/tlm/ws`**). The process runs until **SIGINT** (for example **Ctrl+C** or `docker compose stop`).
+5. `exec /app/rust-bridge/target/release/bridge-server` in the foreground, with **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** and **`BRIDGE_TLM_BIND`** defaulting to **`127.0.0.1:2234`** (telemetry UDP, aligned with default TO_LAB mission TLM port) so the web UI is served on **http://127.0.0.1:8080** (API under **`/api`**, WebSocket **`/api/tlm/ws`**). The process runs until **SIGINT** (for example **Ctrl+C** or `docker compose stop`).
 
 cFS expects to be started from `build/exe/cpu1` so it can find its startup script and loadable modules next to the executable.
 
@@ -53,7 +53,7 @@ After `docker compose up`, use `docker compose logs -f` (or read `/app/cfs-cpu1.
 |-----------|----------------|
 | **core-cpu1** | cFS boots; **BRIDGE_READER** prints `Initialized … subscribed to 2 bridge MsgId(s): 0x18F0 0x18F1` (two Software Bus topics for the bridge dictionary). |
 | **CI_LAB** | No repeated ingest errors when sending commands from the UI. |
-| **bridge-server** | HTTP access to `/api/commands` and successful `POST /api/send` (returns `bytes_sent` / `wire_length`); stderr line **`telemetry UDP listening on 127.0.0.1:5001`** (or `BRIDGE_TLM_BIND`). |
+| **bridge-server** | HTTP access to `/api/commands` and successful `POST /api/send` (returns `bytes_sent` / `wire_length`); stderr line **`telemetry UDP listening on 127.0.0.1:2234`** (or `BRIDGE_TLM_BIND`). |
 | **BRIDGE_READER** | For each sent packet: `Bridge Reader: SB MsgId 0xXXXX wire APID 0xYYY payload: [ … ]` — **CMD_HEARTBEAT** uses MsgId `0x18F0` and wire APID `0x006`; **CMD_PING** uses MsgId `0x18F1` and wire APID `0x007`. |
 
 Manual check: open **http://127.0.0.1:8080**, confirm two commands in the dropdown, send each and match the MsgId/APID lines above.

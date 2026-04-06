@@ -23,7 +23,7 @@ Environment variables for **`bridge-server`**:
 |----------|---------|---------|
 | `BRIDGE_HTTP_BIND` | `127.0.0.1:8080` | TCP listen address |
 | `BRIDGE_UDP_TARGET` | `127.0.0.1:1234` | Connected UDP destination (CI_LAB) |
-| `BRIDGE_TLM_BIND` | `127.0.0.1:5001` | UDP bind address for incoming telemetry (TO_LAB / mock) |
+| `BRIDGE_TLM_BIND` | `127.0.0.1:2234` | UDP bind for incoming telemetry (matches default TO_LAB mission TLM port) |
 | `BRIDGE_STATIC_DIR` | (unset) | If set, serve this directory as static files (SPA fallback to `index.html`) |
 
 Telemetry flow, mock script, and troubleshooting: [docs/TELEMETRY.md](../docs/TELEMETRY.md).
@@ -84,7 +84,7 @@ The container entrypoint runs `bridge-server` after starting cFS `core-cpu1`, wi
 ## Local dev (UI + API)
 
 1. Start cFS (for example Docker) so CI_LAB listens on UDP **1234**.
-2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 BRIDGE_TLM_BIND=127.0.0.1:5001 cargo run --bin bridge-server`).
+2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 BRIDGE_TLM_BIND=127.0.0.1:2234 cargo run --bin bridge-server`).
 3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080` (WebSocket upgrade for telemetry); use the URL Vite prints (**`:5173`**). If you use **only** `docker compose up`, skip Vite and open **`http://127.0.0.1:8080`** instead. Details: [bridge-ui/README.md](../bridge-ui/README.md).
 
 ## Pre-commit

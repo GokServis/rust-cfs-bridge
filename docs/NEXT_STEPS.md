@@ -22,7 +22,7 @@ See also: [TELEMETRY.md](TELEMETRY.md), [AVAILABLE_TELEMETRY.md](AVAILABLE_TELEM
 | Area | What exists today |
 |------|-------------------|
 | **Uplink** | `POST /api/send` → CCSDS + CRC → UDP → CI_LAB; dictionary in `rust-bridge/src/lib.rs`; UI on `/`. |
-| **Downlink** | UDP on `BRIDGE_TLM_BIND` (default `127.0.0.1:5001`); each datagram → `classify_datagram` → `TlmEvent` JSON; `tokio::sync::broadcast` to WebSocket clients at **`GET /api/tlm/ws`**. |
+| **Downlink** | UDP on `BRIDGE_TLM_BIND` (default `127.0.0.1:2234`); each datagram → `classify_datagram` → `TlmEvent` JSON; `tokio::sync::broadcast` to WebSocket clients at **`GET /api/tlm/ws`**. |
 | **Parsing** | ES HK v1 (`es_hk_v1`) and `parse_error` in `rust-bridge/src/tlm/`; other SB products (EVS, SB stats, TO_LAB HK, CI_LAB HK, …) arrive as **`parse_error`** until new `TlmEvent` arms exist — see [AVAILABLE_TELEMETRY.md](AVAILABLE_TELEMETRY.md) (“rust-cfs-bridge — what is parsed today”). |
 | **UI** | MobX `TelemetryStore` opens **`/api/tlm/ws`**, keeps a **bounded buffer**, **filters**, **pagination**, and **`TelemetryLogTable`** on `/telemetry` (`TelemetryOverview`, `EsHkPanel`, `ParseErrorPanel`). |
 | **cFS (this repo)** | Default cpu1 apps: `sample_app`, `ci_lab`, `bridge_reader`, `to_lab`, `sch_lab` (`cfs/cfe/cmake/sample_defs/targets.cmake`). Optional apps (FM, LC, DS, …) are **not** built unless you extend `APPLIST`. Full telemetry **topic** list: `cfs/cfe/cmake/sample_defs/eds/cfe-topicids.xml` — [AVAILABLE_TELEMETRY.md](AVAILABLE_TELEMETRY.md). |
