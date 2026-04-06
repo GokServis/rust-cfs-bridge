@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use rust_bridge::server::build_app;
-use rust_bridge::tlm::es_hk::{CFE_TLM_HEADER_PREFIX_BYTES, ES_HK_PAYLOAD_BYTES};
 use rust_bridge::tlm::classify_datagram;
+use rust_bridge::tlm::es_hk::{CFE_TLM_HEADER_PREFIX_BYTES, ES_HK_PAYLOAD_BYTES};
 use rust_bridge::TlmEvent;
 use rust_bridge::UdpSender;
 use tokio::net::TcpListener;
