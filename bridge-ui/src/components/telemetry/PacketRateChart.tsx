@@ -37,7 +37,7 @@ export function PacketRateChart({ data }: Props) {
             <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} />
             <Tooltip
               labelFormatter={(v) => formatTime(Number(v))}
-              formatter={(v: number) => [v, 'pkt/s']}
+              formatter={(value) => [Number(value ?? 0), 'pkt/s']}
             />
             <Bar dataKey="rate" fill="var(--color-accent, #4a9eff)" isAnimationActive={false} />
           </BarChart>

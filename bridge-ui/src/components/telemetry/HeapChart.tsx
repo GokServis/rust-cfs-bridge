@@ -45,7 +45,7 @@ export function HeapChart({ data }: Props) {
             <YAxis tickFormatter={formatBytes} tick={{ fontSize: 10 }} width={52} />
             <Tooltip
               labelFormatter={(v) => formatTime(Number(v))}
-              formatter={(v: number) => [formatBytes(v)]}
+              formatter={(value) => [formatBytes(Number(value ?? 0))]}
             />
             <Legend iconSize={10} wrapperStyle={{ fontSize: '0.75rem' }} />
             <Line

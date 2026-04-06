@@ -18,6 +18,10 @@ export function apidOf(msg: TlmMessage): number | null {
   return null
 }
 
+export function rawLenOf(msg: TlmMessage): number | null {
+  return 'raw_len' in msg ? msg.raw_len : null
+}
+
 export function summaryLine(msg: TlmMessage): string {
   if (msg.kind === 'es_hk_v1') {
     return `ES HK · cmd ${msg.es_hk.command_counter} · heap free ${msg.es_hk.heap_bytes_free}`
