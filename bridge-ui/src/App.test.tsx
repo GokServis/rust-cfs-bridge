@@ -97,6 +97,6 @@ describe('App', () => {
   it('shows telemetry screen on route', async () => {
     globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response))
     renderApp('/telemetry')
-    expect(await screen.findByText(/Downlink/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Live telemetry/i })).toBeInTheDocument()
   })
 })

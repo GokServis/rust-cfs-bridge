@@ -1,6 +1,7 @@
 //! Async UDP listener → broadcast [`super::TlmEvent`].
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use chrono::Utc;
 use tokio::net::UdpSocket;
@@ -14,22 +15,52 @@ pub async fn run_udp_telemetry_listener(
     tx: broadcast::Sender<TlmEvent>,
 ) -> Result<(), std::io::Error> {
     let socket = UdpSocket::bind(addr).await?;
-    run_udp_telemetry_loop(socket, tx).await
+    run_udp_telemetry_loop(socket, tx).await;
+    Ok(())
+}
+
+/// Infinite loop: bind with backoff, run receive loop, rebind if the loop exits.
+pub async fn run_udp_telemetry_listener_supervised(
+    addr: SocketAddr,
+    tx: broadcast::Sender<TlmEvent>,
+) {
+    let mut backoff_ms: u64 = 200;
+    loop {
+        match UdpSocket::bind(addr).await {
+            Ok(socket) => {
+                if let Ok(a) = socket.local_addr() {
+                    eprintln!("bridge-server: telemetry UDP listening on {a}");
+                }
+                backoff_ms = 200;
+                run_udp_telemetry_loop(socket, tx.clone()).await;
+                eprintln!("bridge-server: telemetry UDP receive loop exited; rebinding");
+            }
+            Err(e) => {
+                eprintln!(
+                    "bridge-server: telemetry UDP bind {addr} failed ({e}); retrying in {backoff_ms}ms"
+                );
+                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                backoff_ms = (backoff_ms.saturating_mul(2)).min(10_000);
+            }
+        }
+    }
 }
 
 /// Forwards datagrams from an already-bound socket (used by tests with `127.0.0.1:0`).
-pub(crate) async fn run_udp_telemetry_loop(
-    socket: UdpSocket,
-    tx: broadcast::Sender<TlmEvent>,
-) -> Result<(), std::io::Error> {
-    let addr = socket.local_addr()?;
-    eprintln!("bridge-server: telemetry UDP listening on {addr}");
+pub(crate) async fn run_udp_telemetry_loop(socket: UdpSocket, tx: broadcast::Sender<TlmEvent>) {
     let mut buf = vec![0u8; 4096];
     loop {
-        let (n, _) = socket.recv_from(&mut buf).await?;
-        let received_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        let event = classify_datagram(&buf[..n], received_at);
-        let _ = tx.send(event);
+        match socket.recv_from(&mut buf).await {
+            Ok((n, _)) => {
+                let received_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+                let event = classify_datagram(&buf[..n], received_at);
+                let _ = tx.send(event);
+            }
+            Err(e) => {
+                eprintln!("bridge-server: telemetry UDP recv_from: {e}");
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
     }
 }
 

@@ -1,7 +1,8 @@
 import { waitFor } from '@testing-library/react'
+import { runInAction } from 'mobx'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { TelemetryStore } from './telemetryStore'
+import { DOWNLINK_STALE_MS, TelemetryStore } from './telemetryStore'
 import { TelemetryUiPrefsStore } from './telemetryUiPrefsStore'
 
 class MockWebSocket {
@@ -74,8 +75,12 @@ describe('TelemetryStore', () => {
     const store = new TelemetryStore()
     store.connect()
     await waitFor(() => expect(store.connected).toBe(true))
-    MockWebSocket.sockets[0].triggerMessage(JSON.stringify(esPayload))
+    expect(store.bridgeLinkLive).toBe(true)
+    expect(store.downlinkLive).toBe(false)
+    const freshPayload = { ...esPayload, received_at: new Date().toISOString() }
+    MockWebSocket.sockets[0].triggerMessage(JSON.stringify(freshPayload))
     await waitFor(() => expect(store.packetCount).toBe(1))
+    expect(store.downlinkLive).toBe(true)
     expect(store.lastMessage?.kind).toBe('es_hk_v1')
     expect(store.entries).toHaveLength(1)
     expect(store.entries[0].seq).toBe(1)
@@ -185,5 +190,29 @@ describe('TelemetryStore', () => {
 
     store.setHideParseError(false)
     expect(prefs.snapshot.hideParseError).toBe(false)
+  })
+
+  it('downlinkLive false when telemetry older than stale window', () => {
+    const store = new TelemetryStore()
+    const t = Date.now()
+    const iso = new Date(t).toISOString()
+    runInAction(() => {
+      store.connected = true
+      store.tickNowMs = t
+    })
+    store.appendMessage({ ...esPayload, received_at: iso })
+    expect(store.downlinkLive).toBe(true)
+    runInAction(() => {
+      store.tickNowMs = t + DOWNLINK_STALE_MS + 1000
+    })
+    expect(store.downlinkLive).toBe(false)
+  })
+
+  it('bridgeLinkLive false after disconnect', async () => {
+    const store = new TelemetryStore()
+    store.connect()
+    await waitFor(() => expect(store.bridgeLinkLive).toBe(true))
+    store.disconnect()
+    await waitFor(() => expect(store.bridgeLinkLive).toBe(false))
   })
 })

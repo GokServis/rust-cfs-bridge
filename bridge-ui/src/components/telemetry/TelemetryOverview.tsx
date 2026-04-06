@@ -25,8 +25,16 @@ export const TelemetryOverview = observer(function TelemetryOverview({
 }: {
   store: TelemetryStore
 }) {
-  const { connected, lastReceivedAt, lastMessage, lastEsHk, lastToLabHk, error, packetCount } =
-    store
+  const {
+    bridgeLinkLive,
+    downlinkLive,
+    lastReceivedAt,
+    lastMessage,
+    lastEsHk,
+    lastToLabHk,
+    error,
+    packetCount,
+  } = store
   const serverTs = serverReceivedAt(lastMessage)
   const [toLabPending, setToLabPending] = useState(false)
   const [toLabError, setToLabError] = useState<string | null>(null)
@@ -54,8 +62,12 @@ export const TelemetryOverview = observer(function TelemetryOverview({
         </h2>
         <div className="telemetry-metrics">
           <div className="telemetry-metrics__row">
-            <span className="telemetry-metrics__k">Link</span>
-            <StatusBadge ok={connected}>{connected ? 'Live' : 'Offline'}</StatusBadge>
+            <span className="telemetry-metrics__k">Bridge (API)</span>
+            <StatusBadge ok={bridgeLinkLive}>{bridgeLinkLive ? 'Live' : 'Offline'}</StatusBadge>
+          </div>
+          <div className="telemetry-metrics__row">
+            <span className="telemetry-metrics__k">Downlink</span>
+            <StatusBadge ok={downlinkLive}>{downlinkLive ? 'Live' : 'Offline'}</StatusBadge>
           </div>
           <div className="telemetry-metrics__row">
             <span className="telemetry-metrics__k">Packets (session)</span>

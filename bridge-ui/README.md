@@ -8,8 +8,8 @@ Web UI for the **rust-cfs-bridge** stack: **MobX** stores, **React Router** (`/`
 
 | How you run things | Open in the browser |
 |--------------------|---------------------|
-| **`docker compose up`** (UI baked into the image) | **`http://127.0.0.1:8080`** — `bridge-server` serves the built **`dist/`** and `/api`. There is **no** Vite process in the container, so **`http://localhost:5173` does not apply**. |
-| **Local UI dev** (`npm run dev` on your machine) | **`http://localhost:5173`** (or whatever Vite prints). You must still run **`bridge-server`** (Docker or `cargo run --bin bridge-server`) so `/api` can be proxied to port **8080**. |
+| **`docker compose up`** | **`http://127.0.0.1:8080`** — the **bridge-ui** container (nginx) serves **`dist/`** and proxies **`/api`** to **bridge-server** on **127.0.0.1:8081**. There is **no** Vite process in the stack, so **`http://localhost:5173` does not apply** unless you run Vite locally. |
+| **Local UI dev** (`npm run dev`) | **`http://localhost:5173`**. Vite proxies **`/api`** to **`127.0.0.1:8081`** (same as Docker nginx). Run **`bridge-server`** with **`BRIDGE_HTTP_BIND=127.0.0.1:8081`** (Compose default) or adjust the proxy in `vite.config.ts`. |
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ npm ci
 
 ## Development
 
-With **`bridge-server`** running (default `http://127.0.0.1:8080`), start Vite; it proxies **`/api`** to that host with **WebSocket upgrade** for telemetry (see `vite.config.ts`).
+With **`bridge-server`** listening on **`127.0.0.1:8081`** (same as Docker Compose), start Vite; it proxies **`/api`** to that host with **WebSocket upgrade** for telemetry (see `vite.config.ts`).
 
 ```bash
 npm run dev
@@ -37,7 +37,7 @@ Open the URL Vite prints (usually `http://localhost:5173`).
 npm run build
 ```
 
-Output is under **`dist/`**. Point **`bridge-server`** at it with **`BRIDGE_STATIC_DIR`** (Docker sets `BRIDGE_STATIC_DIR=/app/bridge-ui/dist`).
+Output is under **`dist/`**. In the **split Compose** stack, nginx serves **`dist/`** from the **bridge-ui** image; the legacy **`entrypoint.sh`** path still sets **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** for a monolithic `docker run`.
 
 ## Lint and test
 

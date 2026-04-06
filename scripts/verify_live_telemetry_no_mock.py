@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import secrets
 import socket
 import struct
@@ -129,19 +130,30 @@ def _post_send(api_root: str, body: str) -> None:
         raise SystemExit(f"POST {url} failed: {e}") from e
 
 
+def _docker_cfs_log_container_names() -> list[str]:
+    """Compose v2 uses `rust-cfs-bridge-cfs`; legacy single container was `rust-cfs-bridge`."""
+    raw = os.environ.get("DOCKER_CFS_LOG_CONTAINER", "").strip()
+    if raw:
+        return [x.strip() for x in raw.split(",") if x.strip()]
+    return ["rust-cfs-bridge-cfs", "rust-cfs-bridge"]
+
+
 def _docker_log_has_enable_output() -> bool:
-    try:
-        p = subprocess.run(
-            ["docker", "logs", "rust-cfs-bridge"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"verify_live_telemetry_no_mock: docker logs skipped: {e}", file=sys.stderr)
-        return False
-    text = (p.stdout or "") + (p.stderr or "")
-    return TO_LAB_GREP_NEEDLE.lower() in text.lower()
+    for container in _docker_cfs_log_container_names():
+        try:
+            p = subprocess.run(
+                ["docker", "logs", container],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            print(f"verify_live_telemetry_no_mock: docker logs {container} skipped: {e}", file=sys.stderr)
+            continue
+        text = (p.stdout or "") + (p.stderr or "")
+        if TO_LAB_GREP_NEEDLE.lower() in text.lower():
+            return True
+    return False
 
 
 def main() -> None:
@@ -160,7 +172,7 @@ def main() -> None:
     ap.add_argument(
         "--check-docker-log",
         action="store_true",
-        help=f"After send, require 'docker logs rust-cfs-bridge' to contain TO_LAB EVS text ({TO_LAB_GREP_NEEDLE!r})",
+        help=f"After send, require docker logs (cfs container, see DOCKER_CFS_LOG_CONTAINER) to contain TO_LAB EVS text ({TO_LAB_GREP_NEEDLE!r})",
     )
     ap.add_argument(
         "--require-both",
@@ -168,7 +180,6 @@ def main() -> None:
         help="Require both es_hk_v1 and to_lab_hk_v1 (default: either kind is enough)",
     )
     args = ap.parse_args()
-    import os
 
     base = args.base_url or os.environ.get("BRIDGE_HTTP_BASE", "http://127.0.0.1:8080")
     ws_url, api_root, host, port = _http_base_to_ws_and_api(base)
@@ -197,8 +208,8 @@ def main() -> None:
         time.sleep(1.5)
         if not _docker_log_has_enable_output():
             raise SystemExit(
-                f"docker logs rust-cfs-bridge did not contain {TO_LAB_GREP_NEEDLE!r} "
-                "(TO_LAB EVS after EnableOutput). Try: docker logs rust-cfs-bridge | grep -i telemetry"
+                f"docker logs ({_docker_cfs_log_container_names()}) did not contain {TO_LAB_GREP_NEEDLE!r} "
+                "(TO_LAB EVS after EnableOutput). Try: docker compose --profile cfs logs cfs | grep -i telemetry"
             )
         print(
             f"verify_live_telemetry_no_mock: docker log contains TO_LAB EVS ({TO_LAB_GREP_NEEDLE!r})",

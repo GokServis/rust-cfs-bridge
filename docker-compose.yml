@@ -1,12 +1,41 @@
+# Default: bridge-server (API + WebSocket on :8081) + bridge-ui (nginx on :8080).
+# Add cFS: docker compose --profile cfs up --build
+
 services:
-  space-bridge:
+  bridge-server:
+    image: rust-cfs-bridge:local
     build:
       context: .
       dockerfile: docker/Dockerfile
-    container_name: rust-cfs-bridge
-    network_mode: "host"
-    # cFS SB pipes use POSIX mqueues; default fs.mqueue.msg_max is often 10 (too small for cFE).
-    # Privileged allows entrypoint.sh to raise msg_max in the container IPC namespace.
+    container_name: rust-cfs-bridge-server
+    network_mode: host
+    entrypoint: ["/app/docker/entrypoint-bridge.sh"]
+    environment:
+      BRIDGE_HTTP_BIND: "127.0.0.1:8081"
+    stdin_open: true
+    tty: true
+
+  bridge-ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bridge-ui
+    container_name: rust-cfs-bridge-ui
+    network_mode: host
+    depends_on:
+      - bridge-server
+    stdin_open: true
+    tty: true
+
+  cfs:
+    profiles:
+      - cfs
+    image: rust-cfs-bridge:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: rust-cfs-bridge-cfs
+    network_mode: host
     privileged: true
+    entrypoint: ["/app/docker/entrypoint-cfs.sh"]
     stdin_open: true
     tty: true

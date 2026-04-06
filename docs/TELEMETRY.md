@@ -12,10 +12,10 @@
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `BRIDGE_TLM_BIND` | `127.0.0.1:2234` | UDP bind for incoming telemetry (matches default **`TO_LAB_MISSION_TLM_PORT`**) |
-| `BRIDGE_HTTP_BIND` | `127.0.0.1:8080` | HTTP + WebSocket bind |
+| `BRIDGE_HTTP_BIND` | `127.0.0.1:8080` | HTTP + WebSocket bind (Compose **bridge-server** uses **8081**; nginx on **8080** proxies `/api`) |
 | `BRIDGE_UDP_TARGET` | `127.0.0.1:1234` | Uplink UDP target (CI_LAB) |
 
-Docker: [entrypoint.sh](../docker/entrypoint.sh) sets `BRIDGE_TLM_BIND` if unset.
+Docker: [entrypoint-bridge.sh](../docker/entrypoint-bridge.sh) / [entrypoint.sh](../docker/entrypoint.sh) set `BRIDGE_TLM_BIND` if unset.
 
 ## WebSocket protocol
 
@@ -35,10 +35,10 @@ python3 scripts/mock_es_hk_udp.py
 python3 scripts/mock_es_hk_udp.py 127.0.0.1:2234
 ```
 
-Inside Docker (host network):
+Inside Docker (host network; **bridge-server** container):
 
 ```bash
-docker exec -it rust-cfs-bridge python3 /app/scripts/mock_es_hk_udp.py
+docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py
 ```
 
 You should see the **Telemetry overview** and **telemetry log** (filters / pagination) on **`/telemetry`** update, or JSON in a WebSocket client.
@@ -49,7 +49,7 @@ Use this after `docker compose build` and `docker compose up` on Linux with host
 
 1. **Container / bridge-server** — In `docker compose logs -f` (or stderr), confirm a line like **`telemetry UDP listening on`** `127.0.0.1:2234` (or your `BRIDGE_TLM_BIND`).
 2. **cFS** — Expect **core-cpu1** boot and **bridge_reader** subscription lines as in docker README; **`CI_LAB listening on UDP`** for uplink.
-3. **Downlink smoke test** — `docker exec -it rust-cfs-bridge python3 /app/scripts/mock_es_hk_udp.py` — open **`http://127.0.0.1:8080/telemetry`**: link **Live**, session packet count increases, **ES HK** panel and **log table** rows update.
+3. **Downlink smoke test** — `docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py` — open **`http://127.0.0.1:8080/telemetry`**: **Bridge (API)** **Live**, **Downlink** **Live** after packets arrive, session packet count increases, **ES HK** panel and **log table** rows update.
 4. **Filters** — Change **Kind** / **APID** / **Search** and use **Previous** / **Next** on the log; **Clear buffer** empties stored rows (WebSocket stays connected).
 5. **Uplink (optional)** — Send **CMD_HEARTBEAT** / **CMD_PING** from `/` and match **bridge_reader** MsgId/APID lines in logs ([MESSAGE_FLOW.md](MESSAGE_FLOW.md)).
 
@@ -69,8 +69,8 @@ Confirm **bridge_reader** lines in `docker compose logs` or `/app/cfs-cpu1.log` 
 With **`docker compose up`** and **no** `mock_es_hk_udp.py`:
 
 1. Send **`CMD_TO_LAB_ENABLE_OUTPUT`** (e.g. `POST /api/send` with `{"command":"CMD_TO_LAB_ENABLE_OUTPUT","sequence_count":0}`).
-2. In **`docker compose logs`** or `docker exec rust-cfs-bridge grep -i 'telemetry output' /app/cfs-cpu1.log`, expect TO_LAB EVS text **`TO telemetry output enabled for IP`** (see `TO_LAB_EnableOutputCmd` in `to_lab_cmds.c`).
-3. On **`ws://127.0.0.1:8080/api/tlm/ws`**, expect JSON with **`kind`** **`es_hk_v1`** and/or **`to_lab_hk_v1`** once SCH/HK drives subscribed packets (may take tens of seconds).
+2. With **cfs** running: **`docker compose --profile cfs logs`** or `docker exec rust-cfs-bridge-cfs grep -i 'telemetry output' /app/cfs-cpu1.log`, expect TO_LAB EVS text **`TO telemetry output enabled for IP`** (see `TO_LAB_EnableOutputCmd` in `to_lab_cmds.c`).
+3. On **`ws://127.0.0.1:8080/api/tlm/ws`** (via nginx) or **`ws://127.0.0.1:8081/api/tlm/ws`** (direct to bridge-server), expect JSON with **`kind`** **`es_hk_v1`** and/or **`to_lab_hk_v1`** once SCH/HK drives subscribed packets (may take tens of seconds).
 
 **Docker image:** the build applies [`docker/patches/sch_lab-hk-schedule.patch`](../docker/patches/sch_lab-hk-schedule.patch) so **SCH_LAB** requests **ES** and **TO_LAB** housekeeping (upstream `sch_lab` ships an empty schedule table otherwise). Without that patch, enable TO_LAB output but see no HK on UDP.
 

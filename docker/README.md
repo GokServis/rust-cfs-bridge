@@ -1,61 +1,66 @@
-# Docker image
+# Docker image and Compose
 
 Repository: [GokServis/rust-cfs-bridge](https://github.com/GokServis/rust-cfs-bridge).
 
-Build context is the **repository root** (so `cfs/` and `rust-bridge/` are available). The compose files reference `docker/Dockerfile` from that context.
+Build context is the **repository root** (so `cfs/`, `rust-bridge/`, and `bridge-ui/` are available).
 
-## Dockerfile
+## Layout
+
+| Image / service | Role |
+|-----------------|------|
+| **`rust-cfs-bridge:local`** (from [`Dockerfile`](Dockerfile)) | Builds cFS, **Node** (for `bridge-ui/dist` baked into the image), and **Rust** `bridge-server`. Used by **`bridge-server`** and **`cfs`** Compose services. |
+| **bridge-ui** (from [`Dockerfile.bridge-ui`](Dockerfile.bridge-ui)) | Multi-stage **Node** build → **nginx** serving **`dist/`** on **:8080**, reverse-proxying **`/api`** and **`/health`** to **`127.0.0.1:8081`**. |
+
+Default **`docker compose up`** starts:
+
+1. **`bridge-server`** — [`entrypoint-bridge.sh`](entrypoint-bridge.sh): **`BRIDGE_HTTP_BIND=127.0.0.1:8081`**, no `BRIDGE_STATIC_DIR` (API + WebSocket only; telemetry UDP default **`127.0.0.1:2234`**).
+2. **`bridge-ui`** — nginx on **http://127.0.0.1:8080** (SPA + proxy to the bridge).
+
+Optional cFS:
+
+```bash
+docker compose --profile cfs up --build
+```
+
+This adds **`cfs`**: [`entrypoint-cfs.sh`](entrypoint-cfs.sh) runs **`core-cpu1`** (foreground with **`tee`** to **`/app/cfs-cpu1.log`**). **Privileged** is required only for this service (mqueue limits).
+
+## Legacy monolithic entrypoint
+
+[`entrypoint.sh`](entrypoint.sh) still runs **cFS** in the background, then **`exec` bridge-server** with **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** so a single process serves **http://127.0.0.1:8080** (API + UI). The **Dockerfile** `ENTRYPOINT` remains this script for **`docker run`** without Compose overrides.
+
+## Dockerfile (main)
 
 - **Base:** `ubuntu:22.04`
 - **Packages:** `build-essential`, `cmake`, `git`, `python3`, `curl`
-- **Rust:** installed with `rustup` (stable), on `PATH` as `/root/.cargo/bin`
-- **cFS:** in `/app/cfs`, applies **`docker/patches/sch_lab-hk-schedule.patch`** (SCH_LAB ES + TO_LAB **SEND_HK**), then copies `cfe/cmake/Makefile.sample` → `Makefile` and `sample_defs`, then:
-  - `make BUILDTYPE=release prep`
-  - `make` and `make install`
-- **Environment for cFS:** `SIMULATION=native` (host 64-bit GCC on amd64), `OMIT_DEPRECATED=true`
-- **Node.js 20:** installed from NodeSource so **`bridge-ui`** can be built (`npm ci`, `npm run build` → `/app/bridge-ui/dist`). See [bridge-ui/README.md](../bridge-ui/README.md).
-- **Rust:** `cargo build --release` in `/app/rust-bridge` (produces **`bridge-server`** and the one-shot **`rust-bridge`** binary).
+- **Rust:** `rustup` stable
+- **cFS:** patch + `make` / `make install` (see inline comments)
+- **Node.js 20:** `bridge-ui` **`npm ci`** + **`npm run build`**
+- **Rust:** `cargo build --release` in `rust-bridge/`
 
-## Entrypoint
-
-[entrypoint.sh](entrypoint.sh) runs:
-
-1. Raises **`fs.mqueue.msg_max`** (for example to **256**) when possible. cFE Software Bus pipes use POSIX message queues; the default limit is often too low. This needs a **privileged** container (see [docker-compose.yml](../docker-compose.yml)); avoid `ipc: host` with a tiny host `msg_max` unless you raise it on the host.
-2. `cd /app/cfs/build/exe/cpu1`
-3. `./core-cpu1` in the background, with **stdout/stderr** copied to **`/app/cfs-cpu1.log`** via `tee` so logs are visible from `docker compose logs` as well as on disk in the container.
-4. **`sleep 2`** so CI_LAB and **bridge_reader** finish registration before the Rust bridge sends UDP.
-5. `exec /app/rust-bridge/target/release/bridge-server` in the foreground, with **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** and **`BRIDGE_TLM_BIND`** defaulting to **`127.0.0.1:2234`** (telemetry UDP, aligned with default TO_LAB mission TLM port) so the web UI is served on **http://127.0.0.1:8080** (API under **`/api`**, WebSocket **`/api/tlm/ws`**). The process runs until **SIGINT** (for example **Ctrl+C** or `docker compose stop`).
-
-cFS expects to be started from `build/exe/cpu1` so it can find its startup script and loadable modules next to the executable.
-
-## Compose
+## Compose files
 
 | File | Use |
 |------|-----|
-| `../docker-compose.yml` | Default: host network, no volume over `/app`; runs pre-built image contents. |
-| `../docker-compose.dev.yml` | Bind mount `.` → `/app`; build cFS and Rust inside the container before `up`. |
+| [`../docker-compose.yml`](../docker-compose.yml) | Default: **bridge-server** + **bridge-ui**; **`cfs`** with **`--profile cfs`**. Host network. |
+| [`../docker-compose.dev.yml`](../docker-compose.dev.yml) | Merge with `docker-compose.yml`: bind-mount **`.` → `/app`** on **bridge-server** and **cfs** for live editing. |
 
-Both use `network_mode: host` for straightforward UDP between the bridge and cFS lab apps on the host loopback. The default service is **`privileged: true`** so the entrypoint can adjust **mqueue** limits inside the container.
+**Direct API (debug):** **`http://127.0.0.1:8081`** — **User-facing UI:** **`http://127.0.0.1:8080`** (through nginx).
 
 ## Manual build
 
-From the repository root:
-
 ```bash
 docker build -f docker/Dockerfile -t rust-cfs-bridge:local .
+docker build -f docker/Dockerfile.bridge-ui -t rust-cfs-bridge-ui:local .
 ```
 
 ## Logs and verification
 
-After `docker compose up`, use `docker compose logs -f` (or read `/app/cfs-cpu1.log` inside the container) and look for:
+| Service | What to expect |
+|---------|----------------|
+| **bridge-server** | `listening on http://127.0.0.1:8081`; `telemetry UDP listening on 127.0.0.1:2234` (or `BRIDGE_TLM_BIND`). |
+| **bridge-ui** | nginx access logs; **`GET /api/health`** via **8080** proxies to bridge. |
+| **cfs** (profile) | **core-cpu1** boot; **BRIDGE_READER** subscription lines; **`/app/cfs-cpu1.log`** inside the container. |
 
-| Component | What to expect |
-|-----------|----------------|
-| **core-cpu1** | cFS boots; **BRIDGE_READER** prints `Initialized … subscribed to 2 bridge MsgId(s): 0x18F0 0x18F1` (two Software Bus topics for the bridge dictionary). |
-| **CI_LAB** | No repeated ingest errors when sending commands from the UI. |
-| **bridge-server** | HTTP access to `/api/commands` and successful `POST /api/send` (returns `bytes_sent` / `wire_length`); stderr line **`telemetry UDP listening on 127.0.0.1:2234`** (or `BRIDGE_TLM_BIND`). |
-| **BRIDGE_READER** | For each sent packet: `Bridge Reader: SB MsgId 0xXXXX wire APID 0xYYY payload: [ … ]` — **CMD_HEARTBEAT** uses MsgId `0x18F0` and wire APID `0x006`; **CMD_PING** uses MsgId `0x18F1` and wire APID `0x007`. |
+Manual check: open **http://127.0.0.1:8080**, confirm commands and telemetry. With **cfs** running, send **CMD_HEARTBEAT** / **CMD_PING** and match **bridge_reader** lines in **`docker compose --profile cfs logs -f cfs`**.
 
-Manual check: open **http://127.0.0.1:8080**, confirm two commands in the dropdown, send each and match the MsgId/APID lines above.
-
-Telemetry (downlink): [docs/TELEMETRY.md](../docs/TELEMETRY.md) — run `python3 /app/scripts/mock_es_hk_udp.py` inside the container and confirm **`/telemetry`** (**overview** + **filtered log table**) updates. Uplink dictionary script: `python3 /app/scripts/verify_uplink_dictionary.py`.
+Telemetry mock (no cFS): `docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py` — see [docs/TELEMETRY.md](../docs/TELEMETRY.md).

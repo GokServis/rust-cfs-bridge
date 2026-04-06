@@ -193,7 +193,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let sender = UdpSender::connect(&udp_target)?;
     let (tlm_tx, _tlm_rx) = broadcast::channel::<TlmEvent>(256);
     let tlm_addr: std::net::SocketAddr = tlm_bind.parse()?;
-    tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener(
+    tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener_supervised(
         tlm_addr,
         tlm_tx.clone(),
     ));
