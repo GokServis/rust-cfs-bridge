@@ -198,4 +198,58 @@ mod tests {
         let ev = classify_datagram(&d, "t".into());
         assert!(matches!(ev, TlmEvent::ParseError { .. }));
     }
+
+    #[test]
+    fn classify_evs_long_event_round_trip() {
+        use crate::tlm::evs_long_event::{
+            API_NAME_BYTES, CFE_TLM_HEADER_PREFIX_BYTES, EVENT_MESSAGE_BYTES,
+            EVS_LONG_EVENT_APID_LEGACY, EVS_LONG_EVENT_MSGID_LE_LEGACY,
+        };
+        let total =
+            CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
+        let user = (total - 6) as u16;
+        let w2 = user - 1;
+        let mut d = vec![0u8; total];
+        d[0..2].copy_from_slice(&(0x0800u16 | EVS_LONG_EVENT_APID_LEGACY).to_be_bytes());
+        d[2..4].copy_from_slice(&0xC000u16.to_be_bytes());
+        d[4..6].copy_from_slice(&w2.to_be_bytes());
+        d[6..8].copy_from_slice(&EVS_LONG_EVENT_MSGID_LE_LEGACY.to_le_bytes());
+        let off = CFE_TLM_HEADER_PREFIX_BYTES;
+        d[off..off + 8].copy_from_slice(b"CFE_EVS\0");
+        let mut i = off + API_NAME_BYTES;
+        d[i..i + 2].copy_from_slice(&1u16.to_le_bytes());
+        i += 2;
+        d[i..i + 2].copy_from_slice(&2u16.to_le_bytes());
+        i += 2;
+        d[i..i + 4].copy_from_slice(&3u32.to_le_bytes());
+        i += 4;
+        d[i..i + 4].copy_from_slice(&4u32.to_le_bytes());
+        i += 4;
+        d[i..i + 5].copy_from_slice(b"hi\0\0\0");
+
+        let ev = classify_datagram(&d, "test".into());
+        match ev {
+            TlmEvent::EvsLongEventV1 { evs_long_event, .. } => {
+                assert_eq!(evs_long_event.packet_id.app_name, "CFE_EVS");
+                assert_eq!(evs_long_event.message, "hi");
+            }
+            _ => panic!("expected EVS long event"),
+        }
+    }
+
+    #[test]
+    fn classify_parse_error_hex_preview_truncates_long_buffer() {
+        let mut d = vec![0xAAu8; 100];
+        d[0..2].copy_from_slice(&0x0800u16.to_be_bytes());
+        d[2..4].copy_from_slice(&0xc000u16.to_be_bytes());
+        // user data 94 bytes => total 100
+        d[4..6].copy_from_slice(&0x005Du16.to_be_bytes());
+        let ev = classify_datagram(&d, "t".into());
+        match ev {
+            TlmEvent::ParseError { hex_preview, .. } => {
+                assert!(hex_preview.contains(" …"));
+            }
+            _ => panic!("expected parse_error"),
+        }
+    }
 }

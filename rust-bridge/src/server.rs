@@ -394,6 +394,14 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn api_error_into_response_bad_request_and_io() {
+        let bad = ApiError::BadRequest("bad".into()).into_response();
+        assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
+        let io = ApiError::Io("disk".into()).into_response();
+        assert_eq!(io.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
     async fn api_send_rejects_bad_json() {
         let recv = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let addr = recv.local_addr().expect("addr");

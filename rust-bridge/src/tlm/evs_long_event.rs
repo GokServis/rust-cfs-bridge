@@ -110,6 +110,53 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_returns_none_without_secondary_header() {
+        let total =
+            CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
+        let user = (total - 6) as u16;
+        let w2 = user - 1;
+        let mut d = vec![0u8; total];
+        // TC (type 1) => no secondary header flag in bit 12
+        d[0..2].copy_from_slice(&(0x1000u16 | EVS_LONG_EVENT_APID_LEGACY).to_be_bytes());
+        d[2..4].copy_from_slice(&0xC000u16.to_be_bytes());
+        d[4..6].copy_from_slice(&w2.to_be_bytes());
+        assert!(parse_evs_long_event_datagram(&d).is_none());
+    }
+
+    #[test]
+    fn parse_returns_none_when_total_length_mismatches_header() {
+        let total =
+            CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
+        let user = (total - 6) as u16;
+        let w2 = user - 1;
+        let mut d = vec![0u8; total - 1];
+        d[0..2].copy_from_slice(&(0x0800u16 | EVS_LONG_EVENT_APID_LEGACY).to_be_bytes());
+        d[2..4].copy_from_slice(&0xC000u16.to_be_bytes());
+        d[4..6].copy_from_slice(&w2.to_be_bytes());
+        assert!(parse_evs_long_event_datagram(&d).is_none());
+    }
+
+    #[test]
+    fn parse_returns_none_when_app_name_not_printable_without_legacy_match() {
+        let total =
+            CFE_TLM_HEADER_PREFIX_BYTES + API_NAME_BYTES + 2 + 2 + 4 + 4 + EVENT_MESSAGE_BYTES;
+        let user = (total - 6) as u16;
+        let w2 = user - 1;
+        let mut d = vec![0x01u8; total];
+        d[0..2].copy_from_slice(&(0x0800u16 | 0x020).to_be_bytes());
+        d[2..4].copy_from_slice(&0xC000u16.to_be_bytes());
+        d[4..6].copy_from_slice(&w2.to_be_bytes());
+        d[6..8].copy_from_slice(&0x9999u16.to_le_bytes());
+        assert!(parse_evs_long_event_datagram(&d).is_none());
+    }
+
+    #[test]
+    fn looks_like_printable_rejects_empty_string() {
+        let b = [0u8; 4];
+        assert!(!looks_like_printable_ascii(&b));
+    }
+
+    #[test]
     fn parse_synthetic_legacy_packet() {
         // Build a synthetic packet: CCSDS primary (APID 9), MsgId LE 0x0809, 8-byte time, then payload.
         let total =
