@@ -8,6 +8,7 @@ import {
   pageSlice,
   totalPageCount,
 } from '../telemetryFiltering'
+import type { TelemetryUiPrefsStore } from './telemetryUiPrefsStore'
 
 export const DEFAULT_TLM_BUFFER_CAP = 2000
 export const DEFAULT_TLM_PAGE_SIZE = 25
@@ -22,6 +23,8 @@ export class TelemetryStore {
   connected = false
   lastReceivedAt: string | null = null
   lastMessage: TlmMessage | null = null
+  lastEsHk: Extract<TlmMessage, { kind: 'es_hk_v1' }> | null = null
+  lastToLabHk: Extract<TlmMessage, { kind: 'to_lab_hk_v1' }> | null = null
   error: string | null = null
   packetCount = 0
 
@@ -32,19 +35,50 @@ export class TelemetryStore {
   kindFilter: KindFilter = 'all'
   apidFilter = ''
   searchText = ''
+  hideParseError = false
 
   pageSize = DEFAULT_TLM_PAGE_SIZE
   pageIndex = 0
 
+  private prefs?: TelemetryUiPrefsStore
   private ws: WebSocket | null = null
   private nextSeq = 1
 
-  constructor() {
+  constructor(prefs?: TelemetryUiPrefsStore) {
+    this.prefs = prefs
     makeAutoObservable(this)
+    this.hydratePrefs()
+  }
+
+  private hydratePrefs(): void {
+    const s = this.prefs?.snapshot
+    if (!s) return
+    this.kindFilter = s.kindFilter
+    this.apidFilter = s.apidFilter
+    this.searchText = s.searchText
+    this.pageSize = Math.max(1, Math.min(500, Math.floor(s.pageSize)))
+    this.hideParseError = s.hideParseError
+  }
+
+  private persistPrefs(): void {
+    if (!this.prefs) return
+    this.prefs.setSnapshot({
+      kindFilter: this.kindFilter,
+      apidFilter: this.apidFilter,
+      searchText: this.searchText,
+      pageSize: this.pageSize,
+      hideParseError: this.hideParseError,
+    })
   }
 
   get filteredEntries(): TlmEntry[] {
-    return filterEntries(this.entries, this.kindFilter, this.apidFilter, this.searchText)
+    return filterEntries(
+      this.entries,
+      this.kindFilter,
+      this.apidFilter,
+      this.searchText,
+      this.hideParseError,
+    )
   }
 
   get filteredCount(): number {
@@ -101,6 +135,11 @@ export class TelemetryStore {
   appendMessage(msg: TlmMessage): void {
     runInAction(() => {
       this.lastMessage = msg
+      if (msg.kind === 'es_hk_v1') {
+        this.lastEsHk = msg
+      } else if (msg.kind === 'to_lab_hk_v1') {
+        this.lastToLabHk = msg
+      }
       this.lastReceivedAt = new Date().toISOString()
       this.packetCount += 1
       this.error = null
@@ -124,6 +163,7 @@ export class TelemetryStore {
       this.kindFilter = kind
       this.pageIndex = 0
     })
+    this.persistPrefs()
   }
 
   setApidFilter(value: string): void {
@@ -131,6 +171,7 @@ export class TelemetryStore {
       this.apidFilter = value
       this.pageIndex = 0
     })
+    this.persistPrefs()
   }
 
   setSearchText(value: string): void {
@@ -138,6 +179,15 @@ export class TelemetryStore {
       this.searchText = value
       this.pageIndex = 0
     })
+    this.persistPrefs()
+  }
+
+  setHideParseError(value: boolean): void {
+    runInAction(() => {
+      this.hideParseError = value
+      this.pageIndex = 0
+    })
+    this.persistPrefs()
   }
 
   setPageSize(size: number): void {
@@ -145,6 +195,7 @@ export class TelemetryStore {
       this.pageSize = Math.max(1, Math.min(500, Math.floor(size)))
       this.pageIndex = 0
     })
+    this.persistPrefs()
   }
 
   goToPage(index: number): void {

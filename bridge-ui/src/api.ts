@@ -18,6 +18,24 @@ export interface SendResult {
   wire_length: number
 }
 
+export async function setToLabOutputEnabled(enabled: boolean): Promise<SendResult> {
+  const r = await fetch(enabled ? '/api/to_lab/output/enable' : '/api/to_lab/output/disable', {
+    method: 'POST',
+  })
+  const text = await r.text()
+  if (!r.ok) {
+    let msg = `Request failed (${r.status})`
+    try {
+      const j = JSON.parse(text) as { error?: string }
+      if (j.error) msg = j.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg)
+  }
+  return JSON.parse(text) as SendResult
+}
+
 export async function fetchCommands(): Promise<CommandMetadata[]> {
   const r = await fetch('/api/commands')
   if (!r.ok) {

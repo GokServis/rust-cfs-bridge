@@ -61,11 +61,29 @@ const parseErr = {
   hex_preview: 'aa bb',
 }
 
+const evsLong = {
+  kind: 'evs_long_event_v1' as const,
+  received_at: '2026-01-03T00:00:00Z',
+  raw_len: 170,
+  primary: { apid: 9, packet_type: 0, sequence_count: 0 },
+  evs_long_event: {
+    packet_id: {
+      app_name: 'CFE_EVS',
+      event_id: 123,
+      event_type: 2,
+      spacecraft_id: 66,
+      processor_id: 1,
+    },
+    message: 'hello',
+  },
+}
+
 describe('telemetryFiltering', () => {
   it('apidOf reads primary', () => {
     expect(apidOf(esMsg)).toBe(7)
     expect(apidOf(toLabMsg)).toBe(0)
     expect(apidOf(parseErr)).toBe(9)
+    expect(apidOf(evsLong)).toBe(9)
   })
 
   it('matchesSearch scans JSON', () => {
@@ -79,11 +97,24 @@ describe('telemetryFiltering', () => {
       { seq: 1, message: esMsg },
       { seq: 2, message: toLabMsg },
       { seq: 3, message: parseErr },
+      { seq: 4, message: evsLong },
     ]
     expect(filterEntries(entries, 'es_hk_v1', '', '').length).toBe(1)
     expect(filterEntries(entries, 'to_lab_hk_v1', '', '').length).toBe(1)
     expect(filterEntries(entries, 'parse_error', '', '').length).toBe(1)
-    expect(filterEntries(entries, 'all', '', '').length).toBe(3)
+    expect(filterEntries(entries, 'evs_long_event_v1', '', '').length).toBe(1)
+    expect(filterEntries(entries, 'all', '', '').length).toBe(4)
+  })
+
+  it('filterEntries hides parse_error when requested', () => {
+    const entries: TlmEntry[] = [
+      { seq: 1, message: esMsg },
+      { seq: 2, message: parseErr },
+      { seq: 3, message: toLabMsg },
+      { seq: 4, message: evsLong },
+    ]
+    expect(filterEntries(entries, 'all', '', '', true).length).toBe(3)
+    expect(filterEntries(entries, 'parse_error', '', '', true).length).toBe(0)
   })
 
   it('filterEntries by apid', () => {
@@ -107,5 +138,6 @@ describe('telemetryFiltering', () => {
     expect(summaryLine(esMsg)).toContain('ES HK')
     expect(summaryLine(toLabMsg)).toContain('TO_LAB HK')
     expect(summaryLine(parseErr)).toBe('bad')
+    expect(summaryLine(evsLong)).toContain('CFE_EVS')
   })
 })

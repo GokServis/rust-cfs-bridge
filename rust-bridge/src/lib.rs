@@ -33,6 +33,8 @@ pub const BRIDGE_WIRE_APID_HEARTBEAT: u16 = 0x006;
 pub const BRIDGE_WIRE_APID_PING: u16 = 0x007;
 /// On-wire CCSDS APID for `CMD_TO_LAB_ENABLE_OUTPUT` (CI_LAB → TO_LAB `EnableOutput`).
 pub const BRIDGE_WIRE_APID_TO_LAB_ENABLE_OUTPUT: u16 = 0x008;
+/// On-wire CCSDS APID for `CMD_TO_LAB_DISABLE_OUTPUT` (CI_LAB → TO_LAB `DisableOutput`).
+pub const BRIDGE_WIRE_APID_TO_LAB_DISABLE_OUTPUT: u16 = 0x009;
 /// TO_LAB command Software Bus MsgId (`0x1800 | 0x80`) — matches `TO_LAB_CMD_MID` in cFS.
 pub const TO_LAB_CMD_SB_MSGID: u16 = 0x1880;
 /// Legacy alias: same as [`BRIDGE_WIRE_APID_HEARTBEAT`].
@@ -86,6 +88,14 @@ impl BridgeCommandSpec {
         software_bus_msg_id: TO_LAB_CMD_SB_MSGID,
         default_payload: &CMD_TO_LAB_ENABLE_OUTPUT_DEFAULT_PAYLOAD,
         payload_len: PayloadLenRule::Exact(16),
+    };
+
+    /// TO_LAB `DisableOutput`: zero-byte payload. Stops TO_LAB telemetry forwarding.
+    pub const CMD_TO_LAB_DISABLE_OUTPUT: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_TO_LAB_DISABLE_OUTPUT,
+        software_bus_msg_id: TO_LAB_CMD_SB_MSGID,
+        default_payload: &[],
+        payload_len: PayloadLenRule::Exact(0),
     };
 
     fn validate_payload_len(&self, command_name: &str, len: usize) -> Result<(), BridgeError> {
@@ -151,14 +161,6 @@ pub fn command_dictionary_entries() -> Vec<CommandMetadata> {
             software_bus_msg_id: BridgeCommandSpec::CMD_PING.software_bus_msg_id,
             payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_PING.payload_len),
         },
-        CommandMetadata {
-            name: "CMD_TO_LAB_ENABLE_OUTPUT",
-            title: "TO_LAB enable output",
-            description: "Sends TO_LAB EnableOutput (FC 6) with a 16-byte dest_IP field. On-wire APID 0x008; CI_LAB emits TO_LAB_CMD SB MsgId 0x1880. Align TO_LAB mission TLM UDP port with BRIDGE_TLM_BIND (see docs).",
-            wire_apid: BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.wire_apid,
-            software_bus_msg_id: BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.software_bus_msg_id,
-            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.payload_len),
-        },
     ]
 }
 
@@ -172,6 +174,7 @@ pub fn command_dictionary_resolve(
         "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
         "CMD_PING" => BridgeCommandSpec::CMD_PING,
         "CMD_TO_LAB_ENABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT,
+        "CMD_TO_LAB_DISABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT,
         _ => return Err(BridgeError::UnknownCommand(name.to_string())),
     };
 
@@ -820,10 +823,10 @@ mod tests {
     #[test]
     fn command_dictionary_entries_includes_heartbeat_and_ping() {
         let e = command_dictionary_entries();
-        assert_eq!(e.len(), 3);
+        assert_eq!(e.len(), 2);
         assert!(e.iter().any(|c| c.name == "CMD_HEARTBEAT"));
         assert!(e.iter().any(|c| c.name == "CMD_PING"));
-        assert!(e.iter().any(|c| c.name == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(!e.iter().any(|c| c.name == "CMD_TO_LAB_ENABLE_OUTPUT"));
     }
 
     #[test]

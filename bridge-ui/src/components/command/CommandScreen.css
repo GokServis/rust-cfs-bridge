@@ -47,13 +47,8 @@
   padding: 0.55rem 0.65rem;
   border-radius: 2px;
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--surface-input);
   color: var(--text-h);
-}
-
-html[data-theme='light'] .command-form input,
-html[data-theme='light'] .command-form select {
-  background: #fff;
 }
 
 .command-form input:hover,

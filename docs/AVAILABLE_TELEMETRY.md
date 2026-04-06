@@ -109,6 +109,8 @@ Onboard, TO_LAB forwards **only** streams that are subscribed in **`to_lab_sub.t
 
 In **this repository**, [`to_lab_sub.c`](../cfs/apps/to_lab/fsw/tables/to_lab_sub.c) enables **`CFE_ES_HK_TLM_MID`** (Executive Services HK) and **`TO_LAB_HK_TLM_MID`** so those streams can be forwarded once **`EnableOutput`** and HK scheduling are active. To add more MsgIds (EVS, CI_LAB HK, …), extend the table and reload per cFS procedures. The sentinel `CFE_SB_MSGID_RESERVED` still marks the end of the list.
 
+As of this branch, the subscription table also includes **`CFE_EVS_LONG_EVENT_MSG_MID`** so EVS long-format event messages can be forwarded to the ground and displayed in the UI log.
+
 After enabling:
 
 1. Commands must **`EnableOutput`** with the ground IP.
@@ -124,10 +126,42 @@ The ground server does **not** automatically know every cFS product. Current beh
 | On-wire | JSON `kind` (`TlmEvent`) | Notes |
 |---------|---------------------------|--------|
 | CCSDS primary + **CFE ES HK** payload (LE 168-byte body after header) | `es_hk_v1` | Matches `rust-bridge/src/tlm/es_hk.rs` and `classify_datagram` in [`rust-bridge/src/tlm/mod.rs`](../rust-bridge/src/tlm/mod.rs). |
-| **TO_LAB HK** TLM (MsgId `0x0880` LE at bytes 6–7; HK payload after 12-byte prefix) | `to_lab_hk_v1` | [`rust-bridge/src/tlm/to_lab_hk.rs`](../rust-bridge/src/tlm/to_lab_hk.rs) — confirm against a live capture if EDS layout differs. |
+| **TO_LAB HK** TLM (MsgId LE at bytes 6–7; payload after cFE TLM prefix) | `to_lab_hk_v1` | [`rust-bridge/src/tlm/to_lab_hk.rs`](../rust-bridge/src/tlm/to_lab_hk.rs) — accepts both legacy (`0x0880`) and EDS capture (`0x0F00`) MsgId. |
+| **EVS long event** (`CFE_EVS_LONG_EVENT_MSG_MID`) | `evs_long_event_v1` | [`rust-bridge/src/tlm/evs_long_event.rs`](../rust-bridge/src/tlm/evs_long_event.rs) — long-format event messages (AppName + IDs + message). |
 | Anything else | `parse_error` | Includes `hex_preview` and optional primary header summary. |
 
-**EVS event messages**, **SB stats**, **CI_LAB HK**, and other products still need **additional parsers** when you enable them in TO_LAB.
+**SB stats**, **CI_LAB HK**, and other products still need **additional parsers** when you enable them in TO_LAB.
+
+---
+
+## Verified on-wire captures (ICD-style)
+
+Use these **hex dumps** as ground-truth when aligning parsers (sample mission, live TO_LAB → `BRIDGE_TLM_BIND`). Update this section when mission config or TO_LAB encode mode changes.
+
+| Product (working label) | JSON `kind` today | Total len | CCSDS APID (11b) | Notes |
+|-------------------------|-------------------|-----------|-------------------|--------|
+| CFE ES HK TLM | `es_hk_v1` | ~180+ | (per packet) | Full layout in [`es_hk.rs`](../rust-bridge/src/tlm/es_hk.rs): 12-byte prefix + 168-byte LE HK body. |
+| TO_LAB HK (EDS capture) | `to_lab_hk_v1` | **20** | **128** (`0x080`) | MsgId LE at bytes 6–7 is `0x0F00` in this capture. |
+
+### 20-byte datagram (APID 128) — `to_lab_hk_v1` sample
+
+**Session context:** Live E2E after `CMD_TO_LAB_ENABLE_OUTPUT`; alternating with valid `es_hk_v1` rows in `/telemetry`.
+
+**Full datagram (hex, spaces for readability):**
+
+```text
+08 80 c0 a5 00 0d 00 0f 46 cd b1 16 00 00 00 00 01 00 00 00
+```
+
+| Field (CCSDS + interpretation) | Bytes (0-based) | Value (this capture) |
+|--------------------------------|-----------------|----------------------|
+| Primary word 0–1 | 0–1 | `0x0880` → APID **128**, TM, sec hdr flag per wire |
+| Seq flags + count | 2–3 | `0xC0A5` |
+| Data length field | 4–5 | `0x000D` → user data **14** bytes → **total packet 6+14 = 20** |
+| TLM MsgId (LE) at 6–7 | 6–7 | `00 0f` → **`0x0F00`** (not `0x0880`) |
+| Remaining user field | 8–19 | `46 cd b1 16 00 00 00 00 01 00 00 00` |
+
+**Action:** Keep this capture as a regression vector for `to_lab_hk_v1`.
 
 ---
 
@@ -143,4 +177,4 @@ The ground server does **not** automatically know every cFS product. Current beh
 
 ## Maintenance
 
-When you **add apps** to `targets.cmake` or **change** `cfe-topicids.xml` / MsgId macros, update this file’s tables so the **mission inventory** stays aligned. When you **add Rust parsers**, update the **rust-cfs-bridge** section above.
+When you **add apps** to `targets.cmake` or **change** `cfe-topicids.xml` / MsgId macros, update this file’s tables so the **mission inventory** stays aligned. When you **add Rust parsers**, update the **rust-cfs-bridge** section above. After **live captures** or parser fixes, refresh **Verified on-wire captures (ICD-style)** so operators and ICD reviews stay aligned with the wire.

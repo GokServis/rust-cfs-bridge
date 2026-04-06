@@ -17,7 +17,9 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::tlm::TlmEvent;
-use crate::{command_dictionary_entries, CcsdsPacket, CommandMetadata, SpaceCommand, UdpSender};
+use crate::{
+    command_dictionary_entries, command_dictionary_resolve, CcsdsPacket, CommandMetadata, SpaceCommand, UdpSender,
+};
 
 /// Shared HTTP state (UDP sender to CI_LAB).
 pub struct AppState {
@@ -100,12 +102,44 @@ async fn send_json(
     }))
 }
 
+async fn to_lab_output_enable(State(state): State<Arc<AppState>>) -> Result<Json<SendResponse>, ApiError> {
+    let cmd = command_dictionary_resolve("CMD_TO_LAB_ENABLE_OUTPUT", 0, None)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let packet = CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let wire_len = 6 + packet.payload.len() + 2;
+    let guard = state.udp.lock().await;
+    let n = guard
+        .send_packet(&packet)
+        .map_err(|e| ApiError::Io(e.to_string()))?;
+    Ok(Json(SendResponse {
+        bytes_sent: n,
+        wire_length: wire_len,
+    }))
+}
+
+async fn to_lab_output_disable(State(state): State<Arc<AppState>>) -> Result<Json<SendResponse>, ApiError> {
+    let cmd = command_dictionary_resolve("CMD_TO_LAB_DISABLE_OUTPUT", 0, None)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let packet = CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let wire_len = 6 + packet.payload.len() + 2;
+    let guard = state.udp.lock().await;
+    let n = guard
+        .send_packet(&packet)
+        .map_err(|e| ApiError::Io(e.to_string()))?;
+    Ok(Json(SendResponse {
+        bytes_sent: n,
+        wire_length: wire_len,
+    }))
+}
+
 /// Builds the API router (nested under `/api` by [`build_app`]).
 pub fn api_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/commands", get(commands))
         .route("/send", post(send_json))
+        .route("/to_lab/output/enable", post(to_lab_output_enable))
+        .route("/to_lab/output/disable", post(to_lab_output_disable))
         .route("/tlm/ws", get(telemetry_ws))
         .with_state(state)
 }
@@ -201,10 +235,10 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).expect("json");
         let arr = v.as_array().expect("array");
-        assert_eq!(arr.len(), 3);
+        assert_eq!(arr.len(), 2);
         assert_eq!(arr[0]["name"], "CMD_HEARTBEAT");
         assert!(arr.iter().any(|e| e["name"] == "CMD_PING"));
-        assert!(arr.iter().any(|e| e["name"] == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(!arr.iter().any(|e| e["name"] == "CMD_TO_LAB_ENABLE_OUTPUT"));
     }
 
     #[tokio::test]
@@ -243,6 +277,78 @@ mod tests {
         let wire = handle.join().expect("thread");
         assert!(!wire.is_empty());
         assert_eq!(wire.len(), 11);
+    }
+
+    #[tokio::test]
+    async fn api_to_lab_output_enable_sends_udp() {
+        let recv = UdpSocket::bind("127.0.0.1:0").expect("bind");
+        recv.set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("timeout");
+        let addr = recv.local_addr().expect("addr");
+
+        let handle = thread::spawn(move || {
+            let mut buf = [0u8; 2048];
+            let n = recv.recv(&mut buf).expect("recv");
+            buf[..n].to_vec()
+        });
+
+        thread::sleep(Duration::from_millis(20));
+
+        let sender = UdpSender::connect(&addr.to_string()).expect("connect");
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, None);
+
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/to_lab/output/enable")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("oneshot");
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let wire = handle.join().expect("thread");
+        // 6-byte header + 16-byte payload + 2-byte CRC
+        assert_eq!(wire.len(), 24);
+    }
+
+    #[tokio::test]
+    async fn api_to_lab_output_disable_sends_udp() {
+        let recv = UdpSocket::bind("127.0.0.1:0").expect("bind");
+        recv.set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("timeout");
+        let addr = recv.local_addr().expect("addr");
+
+        let handle = thread::spawn(move || {
+            let mut buf = [0u8; 2048];
+            let n = recv.recv(&mut buf).expect("recv");
+            buf[..n].to_vec()
+        });
+
+        thread::sleep(Duration::from_millis(20));
+
+        let sender = UdpSender::connect(&addr.to_string()).expect("connect");
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, None);
+
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/to_lab/output/disable")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("oneshot");
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let wire = handle.join().expect("thread");
+        // 6-byte header + 0-byte payload + 2-byte CRC
+        assert_eq!(wire.len(), 8);
     }
 
     #[tokio::test]
