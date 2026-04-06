@@ -57,7 +57,8 @@ impl IntoResponse for ApiError {
 fn map_udp_send_err(e: std::io::Error) -> ApiError {
     let msg = e.to_string();
     if e.kind() == std::io::ErrorKind::ConnectionRefused || msg.contains("Connection refused") {
-        let target = std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
+        let target =
+            std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
         return ApiError::UpstreamUnavailable(format!(
             "UDP target not reachable ({target}): CI_LAB is not listening. Start cFS with: docker compose --profile cfs up --build (or make up-cfs), or run a UDP sink on that port for testing."
         ));
@@ -108,9 +109,7 @@ async fn send_json(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(map_udp_send_err)?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -126,9 +125,7 @@ async fn to_lab_output_enable(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(map_udp_send_err)?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -144,9 +141,7 @@ async fn to_lab_output_disable(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(map_udp_send_err)?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
