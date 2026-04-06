@@ -215,4 +215,103 @@ describe('TelemetryStore', () => {
     store.disconnect()
     await waitFor(() => expect(store.bridgeLinkLive).toBe(false))
   })
+
+  describe('packetRateHistory', () => {
+    it('returns empty array when no entries', () => {
+      const store = new TelemetryStore()
+      expect(store.packetRateHistory).toEqual([])
+    })
+
+    it('counts two messages in the same second as rate=2', () => {
+      const store = new TelemetryStore()
+      const ts = '2026-01-01T00:00:00.100Z'
+      store.appendMessage({ ...esPayload, received_at: ts })
+      store.appendMessage({ ...esPayload, received_at: '2026-01-01T00:00:00.800Z' })
+      const hist = store.packetRateHistory
+      expect(hist).toHaveLength(1)
+      expect(hist[0].rate).toBe(2)
+    })
+
+    it('splits messages across different seconds into separate buckets', () => {
+      const store = new TelemetryStore()
+      store.appendMessage({ ...esPayload, received_at: '2026-01-01T00:00:01.000Z' })
+      store.appendMessage({ ...esPayload, received_at: '2026-01-01T00:00:02.000Z' })
+      store.appendMessage({ ...esPayload, received_at: '2026-01-01T00:00:02.500Z' })
+      const hist = store.packetRateHistory
+      expect(hist).toHaveLength(2)
+      expect(hist[0].rate).toBe(1)
+      expect(hist[1].rate).toBe(2)
+    })
+
+    it('returns at most 60 buckets (oldest dropped)', () => {
+      const store = new TelemetryStore()
+      // insert 70 messages each 1 second apart
+      for (let i = 0; i < 70; i++) {
+        const ts = new Date(1_700_000_000_000 + i * 1000).toISOString()
+        store.appendMessage({ ...esPayload, received_at: ts })
+      }
+      const hist = store.packetRateHistory
+      expect(hist.length).toBeLessThanOrEqual(60)
+      // the last bucket should correspond to the most recent message
+      const lastTs = new Date(1_700_000_000_000 + 69 * 1000).getTime()
+      const lastBucket = Math.floor(lastTs / 1000) * 1000
+      expect(hist[hist.length - 1].t).toBe(lastBucket)
+    })
+
+    it('skips entries with invalid received_at', () => {
+      const store = new TelemetryStore()
+      store.appendMessage({
+        kind: 'parse_error',
+        received_at: 'not-a-date',
+        raw_len: 1,
+        primary: null,
+        message: 'x',
+        hex_preview: '',
+      })
+      expect(store.packetRateHistory).toEqual([])
+    })
+  })
+
+  describe('esHkHistory', () => {
+    it('returns empty array when no ES HK entries', () => {
+      const store = new TelemetryStore()
+      expect(store.esHkHistory).toEqual([])
+    })
+
+    it('maps ES HK entries to { t, heap_bytes_free, heap_max_block_size }', () => {
+      const store = new TelemetryStore()
+      store.appendMessage({
+        ...esPayload,
+        received_at: '2026-01-01T00:00:01.000Z',
+        es_hk: { ...esPayload.es_hk, heap_bytes_free: 1024, heap_max_block_size: 512 },
+      })
+      const hist = store.esHkHistory
+      expect(hist).toHaveLength(1)
+      expect(hist[0].heap_bytes_free).toBe(1024)
+      expect(hist[0].heap_max_block_size).toBe(512)
+      expect(hist[0].t).toBe(new Date('2026-01-01T00:00:01.000Z').getTime())
+    })
+
+    it('excludes non-ES-HK entries', () => {
+      const store = new TelemetryStore()
+      store.appendMessage({ ...esPayload, received_at: '2026-01-01T00:00:01.000Z' })
+      store.appendMessage({
+        kind: 'parse_error',
+        received_at: '2026-01-01T00:00:02.000Z',
+        raw_len: 1,
+        primary: null,
+        message: 'x',
+        hex_preview: '',
+      })
+      expect(store.esHkHistory).toHaveLength(1)
+    })
+
+    it('returns at most 60 ES HK entries', () => {
+      const store = new TelemetryStore()
+      for (let i = 0; i < 70; i++) {
+        store.appendMessage({ ...esPayload, received_at: `2026-01-01T00:00:${String(i).padStart(2, '0')}.000Z` })
+      }
+      expect(store.esHkHistory.length).toBeLessThanOrEqual(60)
+    })
+  })
 })

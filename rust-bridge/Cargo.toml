@@ -12,6 +12,7 @@ server = [
     "dep:tower",
     "dep:tower-http",
     "dep:chrono",
+    "dep:socket2",
 ]
 
 [dependencies]
@@ -23,20 +24,26 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 axum = { version = "0.7", optional = true, features = ["ws"] }
 bytes = { version = "1", optional = true }
 tokio = { version = "1", optional = true, features = [
+    "fs",
+    "io-util",
     "macros",
     "net",
     "rt-multi-thread",
     "signal",
     "sync",
+    "time",
 ] }
 tower = { version = "0.5", optional = true }
 tower-http = { version = "0.5", optional = true, features = ["cors", "fs"] }
+socket2 = { version = "0.5", optional = true }
 
 [dev-dependencies]
+socket2 = "0.5"
 futures-util = "0.3"
 http-body-util = "0.1"
 tokio-tungstenite = "0.24"
 tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
 
 [[bin]]
 name = "bridge-server"

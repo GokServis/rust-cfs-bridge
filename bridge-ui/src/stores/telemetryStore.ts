@@ -8,6 +8,7 @@ import {
   pageSlice,
   totalPageCount,
 } from '../telemetryFiltering'
+import type { AlertStore } from './alertStore'
 import type { TelemetryUiPrefsStore } from './telemetryUiPrefsStore'
 
 export const DEFAULT_TLM_BUFFER_CAP = 2000
@@ -44,14 +45,16 @@ export class TelemetryStore {
   pageIndex = 0
 
   private prefs?: TelemetryUiPrefsStore
+  private alertStore?: AlertStore
   private ws: WebSocket | null = null
   private nextSeq = 1
   /** Refreshed while connected so downlink age updates without new packets. */
   tickNowMs = 0
   private tickTimer: ReturnType<typeof setInterval> | null = null
 
-  constructor(prefs?: TelemetryUiPrefsStore) {
+  constructor(prefs?: TelemetryUiPrefsStore, alertStore?: AlertStore) {
     this.prefs = prefs
+    this.alertStore = alertStore
     makeAutoObservable(this)
     this.hydratePrefs()
   }
@@ -101,6 +104,34 @@ export class TelemetryStore {
 
   get pagedEntries(): TlmEntry[] {
     return pageSlice(this.filteredEntries, this.pageSize, this.effectivePageIndex)
+  }
+
+  /** Packet arrival rate bucketed by second, newest-last, capped at 60 buckets. */
+  get packetRateHistory(): { t: number; rate: number }[] {
+    const buckets = new Map<number, number>()
+    for (const entry of this.entries) {
+      const ms = new Date(entry.message.received_at).getTime()
+      if (Number.isNaN(ms)) continue
+      const bucket = Math.floor(ms / 1000) * 1000
+      buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1)
+    }
+    const sorted = [...buckets.entries()].sort((a, b) => a[0] - b[0])
+    return sorted.slice(-60).map(([t, rate]) => ({ t, rate }))
+  }
+
+  /** Last 60 ES HK data points for heap memory charting. */
+  get esHkHistory(): { t: number; heap_bytes_free: number; heap_max_block_size: number }[] {
+    return this.entries
+      .filter(e => e.message.kind === 'es_hk_v1')
+      .slice(-60)
+      .map(e => {
+        const msg = e.message as Extract<TlmMessage, { kind: 'es_hk_v1' }>
+        return {
+          t: new Date(msg.received_at).getTime(),
+          heap_bytes_free: msg.es_hk.heap_bytes_free,
+          heap_max_block_size: msg.es_hk.heap_max_block_size,
+        }
+      })
   }
 
   /** WebSocket to bridge-server is open. */
@@ -173,6 +204,7 @@ export class TelemetryStore {
 
   /** Append one message (used by WebSocket and tests). */
   appendMessage(msg: TlmMessage): void {
+    this.alertStore?.evaluate(msg)
     runInAction(() => {
       this.lastMessage = msg
       if (msg.kind === 'es_hk_v1') {

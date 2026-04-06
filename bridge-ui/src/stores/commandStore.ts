@@ -7,6 +7,15 @@ import {
   type CommandMetadata,
 } from '../api'
 
+export interface CommandHistoryEntry {
+  name: string
+  sentAt: string
+  sequenceCount: number
+  /** 'sent' = server accepted; 'rejected' = network/validation error. */
+  status: 'sent' | 'rejected'
+  wireLength: number
+}
+
 export class CommandStore {
   commands: CommandMetadata[] = []
   loadError: string | null = null
@@ -15,6 +24,7 @@ export class CommandStore {
   payloadHex = ''
   status: string | null = null
   sending = false
+  history: CommandHistoryEntry[] = []
 
   constructor() {
     makeAutoObservable(this)
@@ -49,22 +59,44 @@ export class CommandStore {
 
   async send(): Promise<void> {
     if (!this.selected) return
+    const name = this.selected
+    const seq = this.sequenceCount
     this.sending = true
     this.status = null
     try {
-      const json = buildNamedCommandJson(this.selected, this.sequenceCount, this.payloadHex)
+      const json = buildNamedCommandJson(name, seq, this.payloadHex)
       const res = await sendCommandJson(json)
       runInAction(() => {
         this.status = `Sent ${res.bytes_sent} bytes on the wire (length ${res.wire_length}).`
+        this.history.push({
+          name,
+          sentAt: new Date().toISOString(),
+          sequenceCount: seq,
+          status: 'sent',
+          wireLength: res.wire_length,
+        })
       })
     } catch (e: unknown) {
       runInAction(() => {
         this.status = e instanceof Error ? e.message : 'Send failed'
+        this.history.push({
+          name,
+          sentAt: new Date().toISOString(),
+          sequenceCount: seq,
+          status: 'rejected',
+          wireLength: 0,
+        })
       })
     } finally {
       runInAction(() => {
         this.sending = false
       })
     }
+  }
+
+  clearHistory(): void {
+    runInAction(() => {
+      this.history = []
+    })
   }
 }

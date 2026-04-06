@@ -29,6 +29,9 @@ export function summaryLine(msg: TlmMessage): string {
     const p = msg.evs_long_event.packet_id
     return `${p.app_name} · EVS ${p.event_id} · type ${p.event_type} · ${msg.evs_long_event.message}`
   }
+  if (msg.kind === 'command_ack') {
+    return `CommandAck · ${msg.name} · seq ${msg.sequence_count} · ${msg.result} · ${msg.latency_ms} ms`
+  }
   return msg.message
 }
 

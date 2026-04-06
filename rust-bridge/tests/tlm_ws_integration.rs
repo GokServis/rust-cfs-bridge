@@ -11,6 +11,40 @@ use rust_bridge::UdpSender;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
 
+/// Sending 10 events in a burst to a channel with capacity=256 must not cause
+/// `RecvError::Lagged` for a subscriber that subscribed before the burst.
+/// This is a regression guard: if the production channel capacity is ever
+/// accidentally lowered below 10, this test will catch it.
+#[tokio::test]
+async fn broadcast_no_lag_at_capacity_256() {
+    let (tx, mut rx1) = tokio::sync::broadcast::channel::<TlmEvent>(256);
+    let mut rx2 = tx.subscribe();
+
+    // Fire 10 events without any receiver consuming — they pile up in the channel.
+    for i in 0u16..10 {
+        tx.send(TlmEvent::ParseError {
+            received_at: format!("2026-01-01T00:00:00.{i:03}Z"),
+            raw_len: 1,
+            primary: None,
+            message: format!("burst-{i}"),
+            hex_preview: String::new(),
+        })
+        .expect("send failed");
+    }
+
+    // Both receivers must drain all 10 — no RecvError::Lagged.
+    for i in 0u16..10 {
+        assert!(
+            rx1.try_recv().is_ok(),
+            "rx1 lagged at event {i} (channel capacity too small)"
+        );
+        assert!(
+            rx2.try_recv().is_ok(),
+            "rx2 lagged at event {i} (channel capacity too small)"
+        );
+    }
+}
+
 fn sample_es_hk_datagram() -> Vec<u8> {
     let total = CFE_TLM_HEADER_PREFIX_BYTES + ES_HK_PAYLOAD_BYTES;
     let mut d = vec![0u8; total];

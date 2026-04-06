@@ -4,7 +4,9 @@ import { useEffect } from 'react'
 import type { CommandMetadata } from '../../api'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { Panel } from '../ui/Panel'
 import { useStore } from '../../stores/useStore'
+import { CommandHistoryLog } from './CommandHistoryLog'
 
 import './CommandScreen.css'
 
@@ -136,6 +138,10 @@ export const CommandScreen = observer(function CommandScreen() {
           {c.status}
         </div>
       ) : null}
+
+      <Panel title="Command History">
+        <CommandHistoryLog history={c.history} onClear={() => c.clearHistory()} />
+      </Panel>
     </div>
   )
 })

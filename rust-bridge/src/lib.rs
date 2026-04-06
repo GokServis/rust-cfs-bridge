@@ -11,6 +11,9 @@ pub mod tlm;
 pub use tlm::TlmEvent;
 
 #[cfg(feature = "server")]
+pub mod persistence;
+
+#[cfg(feature = "server")]
 pub mod server;
 
 pub use udp::UdpSender;
