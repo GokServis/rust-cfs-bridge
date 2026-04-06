@@ -9,7 +9,7 @@ import './App.css'
 
 function payloadHint(p: CommandMetadata['payload']): string {
   if (p.kind === 'exact') {
-    return `Payload must be exactly ${p.bytes} bytes (hex).`
+    return `Override: ${p.bytes * 2} hex digits (${p.bytes} bytes), even length; or leave empty for the default payload.`
   }
   return `Payload length: ${p.min}–${p.max} bytes (hex).`
 }
@@ -53,68 +53,117 @@ export default function App() {
   }, [selected, sequenceCount, payloadHex])
 
   return (
-    <div className="app">
-      <header>
-        <h1>cFS bridge</h1>
-        <p className="lede">
+    <main className="app" aria-labelledby="app-title">
+      <header className="app__header">
+        <h1 id="app-title">cFS bridge</h1>
+        <p className="app__lede" id="app-desc">
           Send dictionary commands as JSON; the server builds CCSDS packets and forwards them over UDP
           to CI_LAB.
         </p>
       </header>
 
-      {loadError && <p className="error">{loadError}</p>}
+      {loadError && (
+        <div className="banner banner--error" role="alert">
+          {loadError}
+        </div>
+      )}
 
-      <section className="panel">
-        <label>
-          Command
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            disabled={commands.length === 0}
-          >
-            {commands.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.title} ({c.name})
-              </option>
-            ))}
-          </select>
-        </label>
+      <section className="app__section" aria-labelledby="send-heading">
+        <h2 id="send-heading" className="app__section-title">
+          Send command
+        </h2>
 
-        {current && (
-          <p className="help">
-            <strong>{current.title}.</strong> {current.description} Software Bus MsgId:{' '}
-            <code>0x{current.software_bus_msg_id.toString(16).toUpperCase()}</code>, wire APID:{' '}
-            <code>0x{current.wire_apid.toString(16).padStart(3, '0')}</code>. {payloadHint(current.payload)}
-          </p>
-        )}
+        <form
+          className="form-card"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void onSend()
+          }}
+        >
+          <div className="form-card__field">
+            <label htmlFor="bridge-command">Command</label>
+            <select
+              id="bridge-command"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              disabled={commands.length === 0}
+              aria-describedby={current ? 'command-help' : undefined}
+            >
+              {commands.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.title} ({c.name})
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <label>
-          Sequence count (0–16383)
-          <input
-            type="number"
-            min={0}
-            max={0x3fff}
-            value={sequenceCount}
-            onChange={(e) => setSequenceCount(Number(e.target.value))}
-          />
-        </label>
+          {current && (
+            <div id="command-help" className="help">
+              <p className="help__intro">
+                <strong>{current.title}.</strong> {current.description}
+              </p>
+              <dl className="help__ids">
+                <div className="help__row">
+                  <dt>CCSDS APID (on UDP wire)</dt>
+                  <dd>
+                    <code>0x{current.wire_apid.toString(16).padStart(3, '0')}</code>
+                  </dd>
+                </div>
+                <div className="help__row">
+                  <dt>Software Bus MsgId (after CI_LAB)</dt>
+                  <dd>
+                    <code>0x{current.software_bus_msg_id.toString(16).toUpperCase()}</code>
+                  </dd>
+                </div>
+              </dl>
+              <p className="help__payload">{payloadHint(current.payload)}</p>
+            </div>
+          )}
 
-        <label>
-          Optional payload (hex digits, even length)
-          <input
-            value={payloadHex}
-            onChange={(e) => setPayloadHex(e.target.value)}
-            placeholder="leave empty for default"
-            spellCheck={false}
-          />
-        </label>
+          <div className="form-card__field">
+            <label htmlFor="sequence-count">Sequence count (0–16383)</label>
+            <input
+              id="sequence-count"
+              type="number"
+              min={0}
+              max={0x3fff}
+              value={sequenceCount}
+              onChange={(e) => setSequenceCount(Number(e.target.value))}
+              inputMode="numeric"
+            />
+          </div>
 
-        <button type="button" onClick={() => void onSend()} disabled={sending || !selected}>
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+          <div className="form-card__field">
+            <label htmlFor="payload-hex">Optional payload (hex digits, even length)</label>
+            <input
+              id="payload-hex"
+              value={payloadHex}
+              onChange={(e) => setPayloadHex(e.target.value)}
+              placeholder="Leave empty for default"
+              spellCheck={false}
+              autoComplete="off"
+              aria-describedby="payload-hint"
+            />
+            <span id="payload-hint" className="field-hint">
+              Hex string only; odd length is rejected by the server.
+            </span>
+          </div>
+
+          <button type="submit" className="btn-primary" disabled={sending || !selected}>
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </form>
       </section>
 
-      {status && <p className={status.startsWith('Sent') ? 'ok' : 'error'}>{status}</p>}
-    </div>
+      {status && (
+        <div
+          className={`status ${status.startsWith('Sent') ? 'status--ok' : 'status--error'}`}
+          role="status"
+          aria-live="polite"
+        >
+          {status}
+        </div>
+      )}
+    </main>
   )
 }

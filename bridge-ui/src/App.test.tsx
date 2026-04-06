@@ -38,6 +38,8 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /cFS bridge/i })).toBeInTheDocument()
     })
+    expect(screen.getByRole('main')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Send command/i })).toBeInTheDocument()
     expect(await screen.findByText(/Software Bus MsgId/i)).toBeInTheDocument()
   })
 

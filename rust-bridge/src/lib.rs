@@ -94,7 +94,7 @@ pub fn command_dictionary_entries() -> Vec<CommandMetadata> {
     vec![CommandMetadata {
         name: "CMD_HEARTBEAT",
         title: "Heartbeat",
-        description: "Sample telecommand used to validate the Rust → CI_LAB → Software Bus path.",
+        description: "Sample telecommand to validate the bridge. The UDP datagram uses CCSDS APID 0x006 on the wire; CI_LAB then publishes a Software Bus message with MsgId 0x18F0 (different roles, not the same field).",
         wire_apid: BRIDGE_WIRE_APID,
         software_bus_msg_id: BRIDGE_SB_MSGID_VALUE,
         payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_HEARTBEAT.payload_len),
