@@ -71,7 +71,7 @@ The container entrypoint runs `bridge-server` after starting cFS `core-cpu1`, wi
 
 1. Start cFS (for example Docker) so CI_LAB listens on UDP **1234**.
 2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 cargo run --bin bridge-server`).
-3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080`. Details: [bridge-ui/README.md](../bridge-ui/README.md).
+3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080`; use the URL Vite prints (**`:5173`**). If you use **only** `docker compose up`, skip Vite and open **`http://127.0.0.1:8080`** instead. Details: [bridge-ui/README.md](../bridge-ui/README.md).
 
 ## Pre-commit
 

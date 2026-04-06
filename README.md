@@ -11,7 +11,7 @@ docker compose build
 docker compose up
 ```
 
-[docker-compose.yml](docker-compose.yml) uses `network_mode: host`; use a Linux host or VM (not Docker Desktop on Mac/Windows for this path). The image builds cFS, **bridge-ui**, and **rust-bridge**; at runtime you get **core-cpu1** and **bridge-server** (browser UI at **http://127.0.0.1:8080**, API under **`/api`**). Details: [docker/Dockerfile](docker/Dockerfile), [docker/README.md](docker/README.md).
+[docker-compose.yml](docker-compose.yml) uses `network_mode: host`; use a Linux host or VM (not Docker Desktop on Mac/Windows for this path). The image builds cFS, **bridge-ui**, and **rust-bridge**; at runtime you get **core-cpu1** and **bridge-server**. Open the web UI at **`http://127.0.0.1:8080`** (not port **5173** — that is only for a Vite dev server on the host; see [bridge-ui/README.md](bridge-ui/README.md)). Details: [docker/Dockerfile](docker/Dockerfile), [docker/README.md](docker/README.md).
 
 For a bind-mounted dev tree, use [docker-compose.dev.yml](docker-compose.dev.yml) and [docker/README.md](docker/README.md).
 
