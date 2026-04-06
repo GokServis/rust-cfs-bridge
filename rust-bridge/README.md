@@ -1,6 +1,6 @@
 # rust-bridge
 
-Small Rust binary that will eventually talk to cFS over the network (for example `std::net::UdpSocket` on `127.0.0.1`, with ports aligned to CI_LAB / TO_LAB in your mission `sample_defs`).
+Rust library and binary that sends CCSDS-style packets to cFS over UDP (`std::net::UdpSocket`), typically to `127.0.0.1` on the port CI_LAB listens on (for example **1234** in the sample mission). A small **command dictionary** maps named commands (such as `CMD_HEARTBEAT`) to wire APID, payload length, and optional hex payload overrides; the library builds headers, payload, and CRC to match **bridge_reader** on the cFS side.
 
 ## Build
 
@@ -41,7 +41,7 @@ cargo install cargo-llvm-cov
 
 - `src/lib.rs` — CCSDS packet + JSON + unit tests.
 - `src/udp.rs` — UDP sender (also covered by a loopback unit test).
-- `src/main.rs` — small binary that sends a sample packet to `127.0.0.1:1234`.
+- `src/main.rs` — binary that sends a dictionary-resolved packet (default heartbeat) to `127.0.0.1:1234`, then exits after a short delay so cFS can process it when run under Docker.
 - `Cargo.toml` — dependencies and Rust edition (`2021`).
 - `check.sh` — **fmt**, **clippy**, **test**, and **coverage** (library ≥90% lines).
 - `coverage.sh` — coverage only (`cargo llvm-cov --lib --fail-under-lines 90`).

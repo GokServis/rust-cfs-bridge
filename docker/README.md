@@ -17,9 +17,11 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
 
 [entrypoint.sh](entrypoint.sh) runs:
 
-1. `cd /app/cfs/build/exe/cpu1`
-2. `./core-cpu1` in the background
-3. `exec /app/rust-bridge/target/release/rust-bridge` in the foreground
+1. Raises **`fs.mqueue.msg_max`** (for example to **256**) when possible. cFE Software Bus pipes use POSIX message queues; the default limit is often too low. This needs a **privileged** container (see [docker-compose.yml](../docker-compose.yml)); avoid `ipc: host` with a tiny host `msg_max` unless you raise it on the host.
+2. `cd /app/cfs/build/exe/cpu1`
+3. `./core-cpu1` in the background, with **stdout/stderr** copied to **`/app/cfs-cpu1.log`** via `tee` so logs are visible from `docker compose logs` as well as on disk in the container.
+4. **`sleep 2`** so CI_LAB and **bridge_reader** finish registration before the Rust bridge sends UDP.
+5. `exec /app/rust-bridge/target/release/rust-bridge` in the foreground.
 
 cFS expects to be started from `build/exe/cpu1` so it can find its startup script and loadable modules next to the executable.
 
@@ -30,7 +32,7 @@ cFS expects to be started from `build/exe/cpu1` so it can find its startup scrip
 | `../docker-compose.yml` | Default: host network, no volume over `/app`; runs pre-built image contents. |
 | `../docker-compose.dev.yml` | Bind mount `.` → `/app`; build cFS and Rust inside the container before `up`. |
 
-Both use `network_mode: host` for straightforward UDP between the bridge and cFS lab apps on the host loopback.
+Both use `network_mode: host` for straightforward UDP between the bridge and cFS lab apps on the host loopback. The default service is **`privileged: true`** so the entrypoint can adjust **mqueue** limits inside the container.
 
 ## Manual build
 
