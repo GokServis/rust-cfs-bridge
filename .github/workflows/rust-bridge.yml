@@ -51,9 +51,19 @@ jobs:
         run: |
           set -euo pipefail
           cargo build --release --bin bridge-server --manifest-path rust-bridge/Cargo.toml
+          # Linux: UDP connect() to an unbound port yields ICMP unreachable; later sends get ECONNREFUSED.
+          # Absorb uplink datagrams so every dictionary POST succeeds (no real CI_LAB in CI).
+          python3 -c '
+          import socket
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.bind(("127.0.0.1", 1234))
+          while True:
+              s.recvfrom(65536)
+          ' &
+          SINK_PID=$!
           ./rust-bridge/target/release/bridge-server &
           PID=$!
-          trap 'kill ${PID} 2>/dev/null || true; wait ${PID} 2>/dev/null || true' EXIT
+          trap 'kill ${PID} ${SINK_PID} 2>/dev/null || true; wait ${PID} 2>/dev/null || true; wait ${SINK_PID} 2>/dev/null || true' EXIT
           for _ in $(seq 1 50); do
             if curl -sf http://127.0.0.1:8080/api/health >/dev/null; then
               break
