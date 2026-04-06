@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 
 import { useStore } from '../../stores/useStore'
 
+import { TelemetryLogTable } from './TelemetryLogTable'
 import { TelemetryOverview } from './TelemetryOverview'
 
 export const TelemetryScreen = observer(function TelemetryScreen() {
@@ -13,5 +14,10 @@ export const TelemetryScreen = observer(function TelemetryScreen() {
     return () => telemetry.disconnect()
   }, [telemetry])
 
-  return <TelemetryOverview store={telemetry} />
+  return (
+    <>
+      <TelemetryOverview store={telemetry} />
+      <TelemetryLogTable store={telemetry} />
+    </>
+  )
 })

@@ -1,0 +1,97 @@
+.telemetry-log {
+  margin-top: 1.25rem;
+}
+
+.telemetry-log__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.telemetry-log__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.telemetry-log__field--grow {
+  flex: 1 1 12rem;
+  min-width: 8rem;
+}
+
+.telemetry-log__label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.telemetry-log__filters select,
+.telemetry-log__filters input[type='text'],
+.telemetry-log__filters input[type='search'] {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface, #0f172a);
+  color: inherit;
+}
+
+.telemetry-log__actions {
+  margin-left: auto;
+}
+
+.telemetry-log__meta {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin: 0 0 0.5rem;
+}
+
+.telemetry-log__table-wrap {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #334155);
+}
+
+.telemetry-log__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.telemetry-log__table th,
+.telemetry-log__table td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #334155);
+}
+
+.telemetry-log__table th {
+  background: rgba(15, 23, 42, 0.6);
+  font-weight: 600;
+}
+
+.telemetry-log__mono {
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.telemetry-log__summary {
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telemetry-log__empty {
+  text-align: center;
+  opacity: 0.8;
+  padding: 1rem !important;
+}
+
+.telemetry-log__pager {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

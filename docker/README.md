@@ -58,4 +58,4 @@ After `docker compose up`, use `docker compose logs -f` (or read `/app/cfs-cpu1.
 
 Manual check: open **http://127.0.0.1:8080**, confirm two commands in the dropdown, send each and match the MsgId/APID lines above.
 
-Telemetry (downlink) validation without changing cFS: [docs/TELEMETRY.md](../docs/TELEMETRY.md) — run `python3 /app/scripts/mock_es_hk_udp.py` inside the container and confirm the UI **Telemetry overview** updates. Uplink dictionary script: `python3 /app/scripts/verify_uplink_dictionary.py`.
+Telemetry (downlink): [docs/TELEMETRY.md](../docs/TELEMETRY.md) — run `python3 /app/scripts/mock_es_hk_udp.py` inside the container and confirm **`/telemetry`** (**overview** + **filtered log table**) updates. Uplink dictionary script: `python3 /app/scripts/verify_uplink_dictionary.py`.

@@ -127,4 +127,25 @@ mod tests {
             TlmEvent::ParseError { message, .. } => panic!("unexpected error: {message}"),
         }
     }
+
+    #[test]
+    fn classify_length_mismatch_is_parse_error() {
+        let mut d = vec![0u8; 32];
+        d[0..2].copy_from_slice(&0x0800u16.to_be_bytes());
+        d[2..4].copy_from_slice(&0xc000u16.to_be_bytes());
+        // data_length_field 0x001A => user data 27 bytes => total 33 bytes; buffer is only 32
+        d[4..6].copy_from_slice(&0x001Au16.to_be_bytes());
+        let ev = classify_datagram(&d, "t".into());
+        match ev {
+            TlmEvent::ParseError { message, .. } => assert!(message.contains("length mismatch")),
+            TlmEvent::EsHkV1 { .. } => panic!("expected parse_error"),
+        }
+    }
+
+    #[test]
+    fn classify_garbage_short_buffer_is_parse_error() {
+        let d = vec![0x01u8, 0x02, 0x03];
+        let ev = classify_datagram(&d, "t".into());
+        assert!(matches!(ev, TlmEvent::ParseError { .. }));
+    }
 }

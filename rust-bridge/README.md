@@ -42,7 +42,7 @@ The Docker image builds this crate in release mode as part of the image build.
 From this directory:
 
 ```bash
-# One-shot: rustfmt, clippy (-D warnings), tests, line coverage (≥80% lines, all targets)
+# One-shot: rustfmt, clippy (-D warnings), tests, line coverage (≥90% lines, all targets)
 ./check.sh
 ```
 
@@ -56,12 +56,12 @@ cargo test
 
 Auto-fix (optional): `cargo fmt --all`, `cargo clippy --all-targets --all-features --fix -- -D warnings`.
 
-**Line coverage (≥80% on all targets)** uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (library, `bridge-server`, and the thin `rust-bridge` binary entrypoints are included in the aggregate gate).
+**Line coverage (≥90% on all targets)** uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (library, `bridge-server`, and the thin `rust-bridge` binary entrypoints are included in the aggregate gate).
 
 ```bash
 rustup component add llvm-tools-preview
 cargo install cargo-llvm-cov
-./coverage.sh              # same as: cargo llvm-cov --all-targets --fail-under-lines 80
+./coverage.sh              # same as: cargo llvm-cov --all-targets --fail-under-lines 90
 # Optional: cargo llvm-cov --all-targets --html --open
 ```
 
@@ -74,8 +74,8 @@ cargo install cargo-llvm-cov
 - `src/main.rs` — one-shot binary for smoke tests.
 - `src/bin/bridge_server.rs` — `bridge-server` entrypoint.
 - `Cargo.toml` — dependencies and Rust edition (`2021`).
-- `check.sh` — **fmt**, **clippy**, **test**, and **coverage** (≥80% lines, all targets).
-- `coverage.sh` — coverage only (`cargo llvm-cov --all-targets --fail-under-lines 80`).
+- `check.sh` — **fmt**, **clippy**, **test**, and **coverage** (≥90% lines, all targets).
+- `coverage.sh` — coverage only (`cargo llvm-cov --all-targets --fail-under-lines 90`).
 
 ## Running in Docker
 

@@ -38,8 +38,8 @@ jobs:
       - name: cargo test
         run: cargo test
 
-      - name: Line coverage (all targets, minimum 80%)
-        run: cargo llvm-cov --all-targets --fail-under-lines 80
+      - name: Line coverage (all targets, minimum 90%)
+        run: cargo llvm-cov --all-targets --fail-under-lines 90
 
   bridge-ui:
     runs-on: ubuntu-latest
@@ -64,5 +64,5 @@ jobs:
       - name: build
         run: npm run build
 
-      - name: test + coverage (minimum 80% lines)
+      - name: test + coverage (minimum 90% lines)
         run: npm run test:coverage
