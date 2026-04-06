@@ -1,0 +1,19 @@
+.ui-panel {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1rem 1.15rem;
+}
+
+html[data-theme='light'] .ui-panel {
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.ui-panel__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}

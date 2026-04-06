@@ -6,6 +6,10 @@
 
 mod udp;
 
+pub mod tlm;
+
+pub use tlm::TlmEvent;
+
 #[cfg(feature = "server")]
 pub mod server;
 

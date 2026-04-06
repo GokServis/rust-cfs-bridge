@@ -1,47 +1,58 @@
-/* Global design tokens and base layout for cFS bridge UI */
+/* Global tokens — use data-theme from ThemeStore (default: dark launch-console) */
 :root {
-  --text: #5c5668;
-  --text-h: #0f0d14;
-  --bg: #faf9fc;
-  --border: #e8e6ec;
-  --code-bg: #f0eef5;
-  --accent: #6d28d9;
-  --accent-bg: rgba(109, 40, 217, 0.14);
-  --accent-border: rgba(109, 40, 217, 0.35);
-  --shadow:
-    rgba(15, 13, 20, 0.06) 0 4px 24px,
-    rgba(15, 13, 20, 0.04) 0 1px 3px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  --mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
-
-  color-scheme: light dark;
-  font: 16px/1.5 var(--sans);
-  color: var(--text);
-  background: var(--bg);
+  --sans: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', Menlo, monospace;
+  font-family: var(--sans);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #a8a3b3;
-    --text-h: #f4f2f8;
-    --bg: #121118;
-    --border: #2a2833;
-    --code-bg: #1e1c26;
-    --accent: #a78bfa;
-    --accent-bg: rgba(167, 139, 250, 0.12);
-    --accent-border: rgba(167, 139, 250, 0.35);
-    --shadow:
-      rgba(0, 0, 0, 0.35) 0 8px 32px,
-      rgba(0, 0, 0, 0.2) 0 2px 8px;
-  }
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --text: #9ca3af;
+  --text-h: #f4f4f5;
+  --text-muted: #6b7280;
+  --bg: #050508;
+  --bg-elevated: #0c0c12;
+  --border: rgba(56, 189, 248, 0.22);
+  --border-dim: rgba(255, 255, 255, 0.06);
+  --code-bg: rgba(0, 0, 0, 0.45);
+  --accent: #22d3ee;
+  --accent-dim: rgba(34, 211, 238, 0.12);
+  --accent-glow: rgba(34, 211, 238, 0.35);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.1);
+  --ok: #4ade80;
+  --ok-bg: rgba(74, 222, 128, 0.1);
+  --shadow: 0 0 0 1px var(--border-dim), 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+  --text: #4b5563;
+  --text-h: #111827;
+  --text-muted: #6b7280;
+  --bg: #f8fafc;
+  --bg-elevated: #ffffff;
+  --border: rgba(14, 165, 233, 0.28);
+  --border-dim: rgba(15, 23, 42, 0.08);
+  --code-bg: #f1f5f9;
+  --accent: #0284c7;
+  --accent-dim: rgba(2, 132, 199, 0.1);
+  --accent-glow: rgba(2, 132, 199, 0.25);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --ok: #16a34a;
+  --ok-bg: rgba(22, 163, 74, 0.1);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.06);
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
+  font: 16px/1.55 var(--sans);
+  color: var(--text);
+  background: var(--bg);
 }
 
 #root {
@@ -52,9 +63,20 @@ body {
 
 code {
   font-family: var(--mono);
-  font-size: 0.9em;
-  padding: 0.15em 0.4em;
-  border-radius: 6px;
+  font-size: 0.88em;
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
   background: var(--code-bg);
-  color: var(--text-h);
+  color: var(--accent);
+  border: 1px solid var(--border-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

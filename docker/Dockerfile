@@ -3,6 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SIMULATION=native
 ENV OMIT_DEPRECATED=true
+ENV BRIDGE_TLM_BIND=127.0.0.1:5001
 
 RUN apt-get update && apt-get install -y \
     build-essential \

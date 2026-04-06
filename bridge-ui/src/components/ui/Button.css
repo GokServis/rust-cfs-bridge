@@ -1,0 +1,42 @@
+.ui-btn {
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  padding: 0.65rem 1.35rem;
+  border-radius: 2px;
+  border: 1px solid var(--accent);
+  background: linear-gradient(180deg, var(--accent-dim) 0%, transparent 100%);
+  color: var(--accent);
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.ui-btn:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-h);
+}
+
+.ui-btn--ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}

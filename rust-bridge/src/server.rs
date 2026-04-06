@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use axum::body::Bytes;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -10,15 +11,18 @@ use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
 use serde::Serialize;
+use tokio::sync::broadcast;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
+use crate::tlm::TlmEvent;
 use crate::{command_dictionary_entries, CcsdsPacket, CommandMetadata, SpaceCommand, UdpSender};
 
 /// Shared HTTP state (UDP sender to CI_LAB).
 pub struct AppState {
     pub udp: Mutex<UdpSender>,
+    pub tlm_tx: broadcast::Sender<TlmEvent>,
 }
 
 #[derive(Debug, Serialize)]
@@ -52,6 +56,31 @@ async fn commands() -> Json<Vec<CommandMetadata>> {
     Json(command_dictionary_entries())
 }
 
+async fn telemetry_ws(
+    State(state): State<Arc<AppState>>,
+    ws: WebSocketUpgrade,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_telemetry_ws(socket, state))
+}
+
+async fn handle_telemetry_ws(mut socket: WebSocket, state: Arc<AppState>) {
+    let mut rx = state.tlm_tx.subscribe();
+    loop {
+        match rx.recv().await {
+            Ok(ev) => {
+                let Ok(json) = serde_json::to_string(&ev) else {
+                    continue;
+                };
+                if socket.send(Message::Text(json)).await.is_err() {
+                    break;
+                }
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Closed) => break,
+        }
+    }
+}
+
 async fn send_json(
     State(state): State<Arc<AppState>>,
     body: Bytes,
@@ -77,13 +106,19 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/commands", get(commands))
         .route("/send", post(send_json))
+        .route("/tlm/ws", get(telemetry_ws))
         .with_state(state)
 }
 
 /// Full application: `/api/*` JSON API, optional SPA fallback from `static_dir`.
-pub fn build_app(sender: UdpSender, static_dir: Option<&str>) -> Router {
+pub fn build_app(
+    sender: UdpSender,
+    tlm_tx: broadcast::Sender<TlmEvent>,
+    static_dir: Option<&str>,
+) -> Router {
     let state = Arc::new(AppState {
         udp: Mutex::new(sender),
+        tlm_tx,
     });
     let api = api_router(state.clone());
 
@@ -105,13 +140,21 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let bind = std::env::var("BRIDGE_HTTP_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     let udp_target =
         std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
+    let tlm_bind =
+        std::env::var("BRIDGE_TLM_BIND").unwrap_or_else(|_| "127.0.0.1:5001".to_string());
     let static_dir = std::env::var("BRIDGE_STATIC_DIR").ok();
 
     let sender = UdpSender::connect(&udp_target)?;
-    let app = build_app(sender, static_dir.as_deref());
+    let (tlm_tx, _tlm_rx) = broadcast::channel::<TlmEvent>(256);
+    let tlm_addr: std::net::SocketAddr = tlm_bind.parse()?;
+    tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener(
+        tlm_addr,
+        tlm_tx.clone(),
+    ));
+    let app = build_app(sender, tlm_tx, static_dir.as_deref());
 
     let listener = tokio::net::TcpListener::bind(&bind).await?;
-    eprintln!("bridge-server: listening on http://{bind} (UDP to {udp_target})");
+    eprintln!("bridge-server: listening on http://{bind} (UDP to {udp_target}, telemetry UDP on {tlm_bind})");
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
@@ -136,7 +179,8 @@ mod tests {
         let recv = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let addr = recv.local_addr().expect("addr");
         let sender = UdpSender::connect(&addr.to_string()).expect("connect");
-        let app = build_app(sender, None);
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, None);
 
         let res = app
             .oneshot(
@@ -173,7 +217,8 @@ mod tests {
         thread::sleep(Duration::from_millis(20));
 
         let sender = UdpSender::connect(&addr.to_string()).expect("connect");
-        let app = build_app(sender, None);
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, None);
 
         let body = r#"{"command":"CMD_HEARTBEAT","sequence_count":0}"#;
         let res = app
@@ -199,7 +244,8 @@ mod tests {
         let recv = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let addr = recv.local_addr().expect("addr");
         let sender = UdpSender::connect(&addr.to_string()).expect("connect");
-        let app = build_app(sender, None);
+        let (tlm_tx, _) = broadcast::channel(4);
+        let app = build_app(sender, tlm_tx, None);
 
         let res = app
             .oneshot(
