@@ -1,5 +1,7 @@
 # Docker image
 
+Repository: [GokServis/rust-cfs-bridge](https://github.com/GokServis/rust-cfs-bridge).
+
 Build context is the **repository root** (so `cfs/` and `rust-bridge/` are available). The compose files reference `docker/Dockerfile` from that context.
 
 ## Dockerfile

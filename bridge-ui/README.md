@@ -1,5 +1,7 @@
 # bridge-ui
 
+Part of [rust-cfs-bridge](https://github.com/GokServis/rust-cfs-bridge).
+
 Web UI for the **rust-cfs-bridge** stack. It loads the command dictionary from **`bridge-server`** (`GET /api/commands`) and sends JSON bodies to **`POST /api/send`**. The server turns that JSON into CCSDS wire format and UDP to CI_LAB; see [rust-bridge/README.md](../rust-bridge/README.md).
 
 ## Which URL?

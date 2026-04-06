@@ -1,5 +1,7 @@
 # rust-bridge
 
+Part of [rust-cfs-bridge](https://github.com/GokServis/rust-cfs-bridge).
+
 Rust library and binaries that send CCSDS-style packets to cFS over UDP (`std::net::UdpSocket`), typically to `127.0.0.1` on the port CI_LAB listens on (for example **1234** in the sample mission). A **command dictionary** maps named commands (for example `CMD_HEARTBEAT`, `CMD_PING`) to on-wire CCSDS APID, matching Software Bus MsgId (used by CI_LAB after ingest), payload length, and optional hex payload overrides; the library builds headers, payload, and CRC to match **bridge_reader** on the cFS side.
 
 ### Migration / compatibility

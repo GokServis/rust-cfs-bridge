@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Fork nasa/cFS, nasa/ci_lab, nasa/cFE into your GitHub account (default: macaris64).
+# Fork nasa/cFS, nasa/ci_lab, nasa/cFE into your GitHub org or account (default: GokServis).
 # Requires: GITHUB_TOKEN or GH_TOKEN with repo scope.
 # Usage: export GITHUB_TOKEN=ghp_... && ./scripts/ensure-github-forks.sh
 
 set -euo pipefail
 
 TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
-OWNER="${GITHUB_FORK_OWNER:-macaris64}"
+OWNER="${GITHUB_FORK_OWNER:-GokServis}"
 
 if [[ -z "${TOKEN}" ]]; then
   echo "Set GITHUB_TOKEN (or GH_TOKEN) to create forks via the GitHub API." >&2

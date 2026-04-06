@@ -7,7 +7,7 @@ Rust and web front end that talk to NASA [cFS](https://github.com/nasa/cFS) over
 **Needs:** Linux (Compose uses `network_mode: host`), Docker, and this repo **with all submodules** checked out.
 
 ```bash
-git clone --recurse-submodules https://github.com/macaris64/rust-cfs-bridge.git
+git clone --recurse-submodules https://github.com/GokServis/rust-cfs-bridge.git
 cd rust-cfs-bridge
 docker compose build
 docker compose up
@@ -30,7 +30,7 @@ Then open **`http://127.0.0.1:8080`**. More detail (Vite dev on **:5173**, image
 | [`docker/`](docker/README.md) | Dockerfile and runtime entrypoint |
 | [`scripts/`](scripts/ensure-github-forks.sh) | Helpers (e.g. GitHub forks for submodules) |
 
-If you already cloned without submodules: `git submodule update --init --recursive`. Remotes point at [macaris64](https://github.com/macaris64) forks so commits are fetchable without NASA write access.
+If you already cloned without submodules: `git submodule update --init --recursive`. Remotes point at the [GokServis](https://github.com/GokServis) organization’s forks so commits are fetchable without NASA write access.
 
 ## License
 
