@@ -51,11 +51,9 @@ impl BridgeCommandSpec {
                 got: len,
             }),
             PayloadLenRule::Range { min, max } if (min..=max).contains(&len) => Ok(()),
-            PayloadLenRule::Range { min, max } => Err(BridgeError::PayloadConstraintRange {
-                min,
-                max,
-                got: len,
-            }),
+            PayloadLenRule::Range { min, max } => {
+                Err(BridgeError::PayloadConstraintRange { min, max, got: len })
+            }
         }
     }
 }
@@ -185,11 +183,7 @@ pub enum BridgeError {
         got: usize,
     },
     #[error("payload length invalid: expected {min}..={max} bytes, got {got}")]
-    PayloadConstraintRange {
-        min: usize,
-        max: usize,
-        got: usize,
-    },
+    PayloadConstraintRange { min: usize, max: usize, got: usize },
     #[error("APID must be <= 0x7FF (got {0})")]
     ApidOutOfRange(u16),
     #[error("sequence count must be <= 0x3FFF (got {0})")]
@@ -359,9 +353,7 @@ impl SpaceCommand {
             } => {
                 let override_bytes = match payload {
                     None => None,
-                    Some(hex) => Some(
-                        decode_hex(&hex).map_err(|e| BridgeError::HexPayload(e))?,
-                    ),
+                    Some(hex) => Some(decode_hex(&hex).map_err(BridgeError::HexPayload)?),
                 };
                 command_dictionary_resolve(&command, sequence_count, override_bytes)
             }
