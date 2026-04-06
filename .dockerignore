@@ -1,5 +1,6 @@
 .git
 **/node_modules
-**/target
+# Rust build output only — do NOT use **/target (that excludes cfe/cmake/target sources).
+rust-bridge/target
 cfs/build
 bridge-ui/dist
