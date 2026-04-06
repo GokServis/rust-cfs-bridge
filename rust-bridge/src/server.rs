@@ -152,8 +152,9 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).expect("json");
         let arr = v.as_array().expect("array");
-        assert!(!arr.is_empty());
+        assert_eq!(arr.len(), 2);
         assert_eq!(arr[0]["name"], "CMD_HEARTBEAT");
+        assert!(arr.iter().any(|e| e["name"] == "CMD_PING"));
     }
 
     #[tokio::test]

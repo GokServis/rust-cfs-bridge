@@ -1,6 +1,12 @@
 # rust-bridge
 
-Rust library and binaries that send CCSDS-style packets to cFS over UDP (`std::net::UdpSocket`), typically to `127.0.0.1` on the port CI_LAB listens on (for example **1234** in the sample mission). A small **command dictionary** maps named commands (such as `CMD_HEARTBEAT`) to wire APID, payload length, and optional hex payload overrides; the library builds headers, payload, and CRC to match **bridge_reader** on the cFS side.
+Rust library and binaries that send CCSDS-style packets to cFS over UDP (`std::net::UdpSocket`), typically to `127.0.0.1` on the port CI_LAB listens on (for example **1234** in the sample mission). A **command dictionary** maps named commands (for example `CMD_HEARTBEAT`, `CMD_PING`) to on-wire CCSDS APID, matching Software Bus MsgId (used by CI_LAB after ingest), payload length, and optional hex payload overrides; the library builds headers, payload, and CRC to match **bridge_reader** on the cFS side.
+
+### Migration / compatibility
+
+- **`CMD_HEARTBEAT`** remains **APID `0x006`** on the wire and **SB MsgId `0x18F0`** after CI_LAB — unchanged for existing scripts and UI defaults.
+- **`CMD_PING`** uses **APID `0x007`** and **MsgId `0x18F1`**. Numeric values are defined in both Rust (`bridge_*` constants in `lib.rs`) and [`cfs/apps/bridge_reader/fsw/inc/bridge_reader_mission_ids.h`](../cfs/apps/bridge_reader/fsw/inc/bridge_reader_mission_ids.h); keep them aligned when adding commands.
+- **Legacy JSON** `{ "apid", "sequence_count", "payload" }` is unchanged. Only APIDs allowlisted in CI_LAB are accepted as bridge wire format; others follow the normal CI_LAB path.
 
 ## Binaries
 

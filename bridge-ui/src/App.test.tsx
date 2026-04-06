@@ -12,6 +12,14 @@ const sampleCommands = [
     software_bus_msg_id: 0x18f0,
     payload: { kind: 'exact' as const, bytes: 3 },
   },
+  {
+    name: 'CMD_PING',
+    title: 'Ping',
+    description: 'Second command.',
+    wire_apid: 7,
+    software_bus_msg_id: 0x18f1,
+    payload: { kind: 'exact' as const, bytes: 3 },
+  },
 ]
 
 describe('App', () => {
@@ -41,6 +49,8 @@ describe('App', () => {
     expect(screen.getByRole('main')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Send command/i })).toBeInTheDocument()
     expect(await screen.findByText(/Software Bus MsgId/i)).toBeInTheDocument()
+    const cmdSelect = screen.getByRole('combobox', { name: /Command/i })
+    expect(cmdSelect.querySelectorAll('option')).toHaveLength(2)
   })
 
   it('sends command when Send is clicked', async () => {
