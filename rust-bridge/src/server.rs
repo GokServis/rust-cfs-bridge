@@ -191,7 +191,9 @@ pub async fn run_command_verifier(state: Arc<AppState>) {
     let mut rx = state.tlm_tx.subscribe();
     loop {
         match rx.recv().await {
-            Ok(TlmEvent::EsHkV1 { es_hk, received_at, .. }) => {
+            Ok(TlmEvent::EsHkV1 {
+                es_hk, received_at, ..
+            }) => {
                 let mut last = state.last_es_counters.lock().await;
                 let (prev_cmd, prev_err) = *last;
                 *last = (es_hk.command_counter, es_hk.command_error_counter);
@@ -300,13 +302,21 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     if let Some(ref root) = static_dir {
         let index = format!("{}/index.html", root.trim_end_matches('/'));
-        let static_svc =
-            tower_http::services::ServeDir::new(root)
-                .not_found_service(tower_http::services::ServeFile::new(index.clone()));
+        let static_svc = tower_http::services::ServeDir::new(root)
+            .not_found_service(tower_http::services::ServeFile::new(index.clone()));
         app = app
-            .route_service("/", axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())))
-            .route_service("/telemetry", axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())))
-            .route_service("/dashboard", axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())))
+            .route_service(
+                "/",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
+            .route_service(
+                "/telemetry",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
+            .route_service(
+                "/dashboard",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
             .fallback_service(static_svc);
     }
 

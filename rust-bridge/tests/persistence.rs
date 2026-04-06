@@ -39,6 +39,12 @@ async fn journal_writer_appends_lines() {
     let file_path = found.expect("journal file not found");
     let content = std::fs::read_to_string(file_path).unwrap();
 
-    assert!(content.contains("line-one"), "missing line-one in:\n{content}");
-    assert!(content.contains("line-two"), "missing line-two in:\n{content}");
+    assert!(
+        content.contains("line-one"),
+        "missing line-one in:\n{content}"
+    );
+    assert!(
+        content.contains("line-two"),
+        "missing line-two in:\n{content}"
+    );
 }

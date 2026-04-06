@@ -8,6 +8,8 @@ import {
   YAxis,
 } from 'recharts'
 
+import { formatChartTime } from './telemetryChartFormat'
+
 export interface PacketRateBucket {
   t: number
   rate: number
@@ -15,10 +17,6 @@ export interface PacketRateBucket {
 
 interface Props {
   data: PacketRateBucket[]
-}
-
-export function formatTime(t: number): string {
-  return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 export function PacketRateChart({ data }: Props) {
@@ -30,13 +28,13 @@ export function PacketRateChart({ data }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #444)" />
             <XAxis
               dataKey="t"
-              tickFormatter={formatTime}
+              tickFormatter={formatChartTime}
               tick={{ fontSize: 10 }}
               minTickGap={40}
             />
             <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} />
             <Tooltip
-              labelFormatter={(v) => formatTime(Number(v))}
+              labelFormatter={(v) => formatChartTime(Number(v))}
               formatter={(value) => [Number(value ?? 0), 'pkt/s']}
             />
             <Bar dataKey="rate" fill="var(--color-accent, #4a9eff)" isAnimationActive={false} />

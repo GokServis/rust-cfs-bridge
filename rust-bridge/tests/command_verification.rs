@@ -3,10 +3,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use rust_bridge::server::{AppState, PendingCommand, run_command_verifier};
-use rust_bridge::tlm::{TlmEvent, CommandAckResult};
-use rust_bridge::tlm::es_hk::{CFE_TLM_HEADER_PREFIX_BYTES, ES_HK_PAYLOAD_BYTES};
+use rust_bridge::server::{run_command_verifier, AppState, PendingCommand};
 use rust_bridge::tlm::classify_datagram;
+use rust_bridge::tlm::es_hk::{CFE_TLM_HEADER_PREFIX_BYTES, ES_HK_PAYLOAD_BYTES};
+use rust_bridge::tlm::{CommandAckResult, TlmEvent};
 use rust_bridge::UdpSender;
 use tokio::sync::broadcast;
 
@@ -61,7 +61,11 @@ async fn command_verifier_emits_accepted_when_cmd_counter_increments() {
     .await
     .expect("timed out waiting for CommandAck");
 
-    assert!(matches!(ack.0, CommandAckResult::Accepted), "expected Accepted, got {:?}", ack.0);
+    assert!(
+        matches!(ack.0, CommandAckResult::Accepted),
+        "expected Accepted, got {:?}",
+        ack.0
+    );
     assert_eq!(ack.1, "CMD_HEARTBEAT");
 }
 
@@ -103,6 +107,10 @@ async fn command_verifier_emits_rejected_when_err_counter_increments() {
     .await
     .expect("timed out waiting for CommandAck");
 
-    assert!(matches!(ack.0, CommandAckResult::Rejected), "expected Rejected, got {:?}", ack.0);
+    assert!(
+        matches!(ack.0, CommandAckResult::Rejected),
+        "expected Rejected, got {:?}",
+        ack.0
+    );
     assert_eq!(ack.1, "CMD_PING");
 }

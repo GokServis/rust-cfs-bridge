@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { HeapChart, formatBytes, formatTime } from './HeapChart'
+import { HeapChart } from './HeapChart'
+import { formatChartBytes, formatChartTime } from './telemetryChartFormat'
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -39,23 +40,23 @@ describe('HeapChart', () => {
   })
 })
 
-describe('formatBytes', () => {
+describe('formatChartBytes', () => {
   it('formats bytes less than 1 KB as raw bytes', () => {
-    expect(formatBytes(512)).toBe('512 B')
+    expect(formatChartBytes(512)).toBe('512 B')
   })
 
   it('formats values >= 1 KB as KB', () => {
-    expect(formatBytes(2048)).toBe('2 KB')
+    expect(formatChartBytes(2048)).toBe('2 KB')
   })
 
   it('formats values >= 1 MB as MB', () => {
-    expect(formatBytes(2 * 1_048_576)).toBe('2.0 MB')
+    expect(formatChartBytes(2 * 1_048_576)).toBe('2.0 MB')
   })
 })
 
-describe('formatTime (HeapChart)', () => {
+describe('formatChartTime', () => {
   it('returns a non-empty time string for a valid timestamp', () => {
-    const result = formatTime(1_700_000_000_000)
+    const result = formatChartTime(1_700_000_000_000)
     expect(typeof result).toBe('string')
     expect(result.length).toBeGreaterThan(0)
   })

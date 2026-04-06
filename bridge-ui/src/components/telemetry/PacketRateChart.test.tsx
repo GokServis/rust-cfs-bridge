@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { PacketRateChart, formatTime } from './PacketRateChart'
+import { PacketRateChart } from './PacketRateChart'
+import { formatChartTime } from './telemetryChartFormat'
 
 // Recharts uses ResizeObserver and SVG which are not fully supported in happy-dom.
 // Mock the library so tests focus on component logic, not charting internals.
@@ -40,9 +41,9 @@ describe('PacketRateChart', () => {
   })
 })
 
-describe('formatTime (PacketRateChart)', () => {
+describe('formatChartTime', () => {
   it('returns a non-empty time string for a valid timestamp', () => {
-    const result = formatTime(1_700_000_000_000)
+    const result = formatChartTime(1_700_000_000_000)
     expect(typeof result).toBe('string')
     expect(result.length).toBeGreaterThan(0)
   })

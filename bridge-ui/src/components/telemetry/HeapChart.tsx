@@ -9,6 +9,8 @@ import {
   YAxis,
 } from 'recharts'
 
+import { formatChartBytes, formatChartTime } from './telemetryChartFormat'
+
 export interface HeapDataPoint {
   t: number
   heap_bytes_free: number
@@ -17,16 +19,6 @@ export interface HeapDataPoint {
 
 interface Props {
   data: HeapDataPoint[]
-}
-
-export function formatTime(t: number): string {
-  return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-}
-
-export function formatBytes(v: number): string {
-  if (v >= 1_048_576) return `${(v / 1_048_576).toFixed(1)} MB`
-  if (v >= 1024) return `${(v / 1024).toFixed(0)} KB`
-  return `${v} B`
 }
 
 export function HeapChart({ data }: Props) {
@@ -38,14 +30,14 @@ export function HeapChart({ data }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #444)" />
             <XAxis
               dataKey="t"
-              tickFormatter={formatTime}
+              tickFormatter={formatChartTime}
               tick={{ fontSize: 10 }}
               minTickGap={40}
             />
-            <YAxis tickFormatter={formatBytes} tick={{ fontSize: 10 }} width={52} />
+            <YAxis tickFormatter={formatChartBytes} tick={{ fontSize: 10 }} width={52} />
             <Tooltip
-              labelFormatter={(v) => formatTime(Number(v))}
-              formatter={(value) => [formatBytes(Number(value ?? 0))]}
+              labelFormatter={(v) => formatChartTime(Number(v))}
+              formatter={(value) => [formatChartBytes(Number(value ?? 0))]}
             />
             <Legend iconSize={10} wrapperStyle={{ fontSize: '0.75rem' }} />
             <Line
