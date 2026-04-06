@@ -30,8 +30,8 @@ repos:
         files: ^rust-bridge/
 
       - id: rust-coverage
-        name: rust llvm-cov (≥80% lines)
-        entry: bash -c 'cd rust-bridge && cargo llvm-cov --all-targets --fail-under-lines 80'
+        name: rust llvm-cov (≥90% lines)
+        entry: bash -c 'cd rust-bridge && cargo llvm-cov --all-targets --fail-under-lines 90'
         language: system
         pass_filenames: false
         files: ^rust-bridge/

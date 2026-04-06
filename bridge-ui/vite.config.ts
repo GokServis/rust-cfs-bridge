@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:8080',
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        ws: true,
+      },
     },
   },
   test: {
@@ -16,9 +19,14 @@ export default defineConfig({
     setupFiles: ['./src/test-setup.ts'],
     coverage: {
       provider: 'v8',
-      thresholds: { lines: 80 },
+      thresholds: { lines: 90 },
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/main.tsx', 'src/test-setup.ts', '**/*.d.ts'],
+      exclude: [
+        'src/main.tsx',
+        'src/test-setup.ts',
+        'src/telemetryTypes.ts',
+        '**/*.d.ts',
+      ],
     },
   },
 })

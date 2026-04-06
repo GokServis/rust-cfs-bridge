@@ -28,7 +28,9 @@ Then open **`http://127.0.0.1:8080`**. More detail (Vite dev on **:5173**, image
 | [`rust-bridge/`](rust-bridge/README.md) | Rust library and `bridge-server` |
 | [`bridge-ui/`](bridge-ui/README.md) | Web UI |
 | [`docker/`](docker/README.md) | Dockerfile and runtime entrypoint |
-| [`scripts/`](scripts/ensure-github-forks.sh) | Helpers (e.g. GitHub forks for submodules) |
+| [`scripts/`](scripts/) | Helpers: `mock_es_hk_udp.py`, `verify_uplink_dictionary.py`, [ensure-github-forks.sh](scripts/ensure-github-forks.sh) |
+| [`docs/TELEMETRY.md`](docs/TELEMETRY.md) | Telemetry UDP / WebSocket / troubleshooting |
+| [`docs/AVAILABLE_TELEMETRY.md`](docs/AVAILABLE_TELEMETRY.md) | cFS topic inventory, TO_LAB path, Rust parser matrix |
 
 If you already cloned without submodules: `git submodule update --init --recursive`. Remotes point at the [GokServis](https://github.com/GokServis) organization’s forks so commits are fetchable without NASA write access.
 

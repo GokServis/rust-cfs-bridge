@@ -15,7 +15,7 @@ Rust library and binaries that send CCSDS-style packets to cFS over UDP (`std::n
 | Binary | Role |
 |--------|------|
 | `rust-bridge` | One-shot: sends a sample dictionary packet (default heartbeat) then exits (useful for smoke tests). |
-| `bridge-server` | Long-lived HTTP server: `GET /api/commands`, `POST /api/send`, `GET /api/health`; optional static UI when `BRIDGE_STATIC_DIR` points at a built [bridge-ui](../bridge-ui) `dist/` tree (see [bridge-ui/README.md](../bridge-ui/README.md)). |
+| `bridge-server` | Long-lived HTTP server: `GET /api/commands`, `POST /api/send`, `GET /api/health`, WebSocket **`GET /api/tlm/ws`** for telemetry JSON; optional static UI when `BRIDGE_STATIC_DIR` points at a built [bridge-ui](../bridge-ui) `dist/` tree (see [bridge-ui/README.md](../bridge-ui/README.md)). |
 
 Environment variables for **`bridge-server`**:
 
@@ -23,7 +23,10 @@ Environment variables for **`bridge-server`**:
 |----------|---------|---------|
 | `BRIDGE_HTTP_BIND` | `127.0.0.1:8080` | TCP listen address |
 | `BRIDGE_UDP_TARGET` | `127.0.0.1:1234` | Connected UDP destination (CI_LAB) |
+| `BRIDGE_TLM_BIND` | `127.0.0.1:5001` | UDP bind address for incoming telemetry (TO_LAB / mock) |
 | `BRIDGE_STATIC_DIR` | (unset) | If set, serve this directory as static files (SPA fallback to `index.html`) |
+
+Telemetry flow, mock script, and troubleshooting: [docs/TELEMETRY.md](../docs/TELEMETRY.md).
 
 ## Build
 
@@ -39,7 +42,7 @@ The Docker image builds this crate in release mode as part of the image build.
 From this directory:
 
 ```bash
-# One-shot: rustfmt, clippy (-D warnings), tests, line coverage (≥80% lines, all targets)
+# One-shot: rustfmt, clippy (-D warnings), tests, line coverage (≥90% lines, all targets)
 ./check.sh
 ```
 
@@ -51,12 +54,14 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 ```
 
-**Line coverage (≥80% on all targets)** uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (library, `bridge-server`, and the thin `rust-bridge` binary entrypoints are included in the aggregate gate).
+Auto-fix (optional): `cargo fmt --all`, `cargo clippy --all-targets --all-features --fix -- -D warnings`.
+
+**Line coverage (≥90% on all targets)** uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (library, `bridge-server`, and the thin `rust-bridge` binary entrypoints are included in the aggregate gate).
 
 ```bash
 rustup component add llvm-tools-preview
 cargo install cargo-llvm-cov
-./coverage.sh              # same as: cargo llvm-cov --all-targets --fail-under-lines 80
+./coverage.sh              # same as: cargo llvm-cov --all-targets --fail-under-lines 90
 # Optional: cargo llvm-cov --all-targets --html --open
 ```
 
@@ -64,12 +69,13 @@ cargo install cargo-llvm-cov
 
 - `src/lib.rs` — CCSDS packet + JSON + command dictionary metadata + unit tests.
 - `src/udp.rs` — UDP sender (also covered by a loopback unit test).
-- `src/server.rs` — Axum HTTP API (behind the `server` feature, on by default).
+- `src/server.rs` — Axum HTTP API + WebSocket telemetry (behind the `server` feature, on by default).
+- `src/tlm/` — Telemetry UDP task, CCSDS primary + CFE ES HK parsing, `TlmEvent` JSON.
 - `src/main.rs` — one-shot binary for smoke tests.
 - `src/bin/bridge_server.rs` — `bridge-server` entrypoint.
 - `Cargo.toml` — dependencies and Rust edition (`2021`).
-- `check.sh` — **fmt**, **clippy**, **test**, and **coverage** (≥80% lines, all targets).
-- `coverage.sh` — coverage only (`cargo llvm-cov --all-targets --fail-under-lines 80`).
+- `check.sh` — **fmt**, **clippy**, **test**, and **coverage** (≥90% lines, all targets).
+- `coverage.sh` — coverage only (`cargo llvm-cov --all-targets --fail-under-lines 90`).
 
 ## Running in Docker
 
@@ -78,8 +84,8 @@ The container entrypoint runs `bridge-server` after starting cFS `core-cpu1`, wi
 ## Local dev (UI + API)
 
 1. Start cFS (for example Docker) so CI_LAB listens on UDP **1234**.
-2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 cargo run --bin bridge-server`).
-3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080`; use the URL Vite prints (**`:5173`**). If you use **only** `docker compose up`, skip Vite and open **`http://127.0.0.1:8080`** instead. Details: [bridge-ui/README.md](../bridge-ui/README.md).
+2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 BRIDGE_TLM_BIND=127.0.0.1:5001 cargo run --bin bridge-server`).
+3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080` (WebSocket upgrade for telemetry); use the URL Vite prints (**`:5173`**). If you use **only** `docker compose up`, skip Vite and open **`http://127.0.0.1:8080`** instead. Details: [bridge-ui/README.md](../bridge-ui/README.md).
 
 ## Pre-commit
 

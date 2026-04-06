@@ -1,0 +1,109 @@
+.animated-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.animated-backdrop__grid {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: backdrop-drift 120s linear infinite;
+}
+
+html[data-theme='light'] .animated-backdrop__grid {
+  background-image:
+    linear-gradient(rgba(2, 132, 199, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 132, 199, 0.06) 1px, transparent 1px);
+}
+
+@keyframes backdrop-drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(48px, 48px);
+  }
+}
+
+.animated-backdrop__glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.15), transparent 55%);
+  animation: backdrop-glow 14s ease-in-out infinite alternate;
+}
+
+html[data-theme='light'] .animated-backdrop__glow {
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(2, 132, 199, 0.12), transparent 55%);
+}
+
+@keyframes backdrop-glow {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animated-backdrop__scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(34, 211, 238, 0.25),
+    rgba(34, 211, 238, 0.5),
+    rgba(34, 211, 238, 0.25),
+    transparent
+  );
+  animation: backdrop-scan 8s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+html[data-theme='light'] .animated-backdrop__scan {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(2, 132, 199, 0.2),
+    rgba(2, 132, 199, 0.45),
+    rgba(2, 132, 199, 0.2),
+    transparent
+  );
+}
+
+@keyframes backdrop-scan {
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.6;
+  }
+  92% {
+    opacity: 0.6;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-backdrop__grid,
+  .animated-backdrop__glow,
+  .animated-backdrop__scan {
+    animation: none;
+  }
+  .animated-backdrop__scan {
+    top: 40%;
+    opacity: 0.25;
+  }
+}

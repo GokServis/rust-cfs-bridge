@@ -81,3 +81,7 @@ curl -sS -X POST http://127.0.0.1:8080/api/send \
 ```
 
 Confirm **bridge-server** is listening and **bridge_reader** prints the matching MsgId, APID, and payload. See [docker/README.md](../docker/README.md) for the full checklist.
+
+## Telemetry downlink (separate path)
+
+Incoming **telemetry** uses UDP on **`BRIDGE_TLM_BIND`** (default `127.0.0.1:5001`) and WebSocket **`/api/tlm/ws`** to the UI — not the CI_LAB uplink port. See [TELEMETRY.md](TELEMETRY.md) for wire format, mock script, and troubleshooting.

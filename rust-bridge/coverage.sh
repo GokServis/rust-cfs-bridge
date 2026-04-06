@@ -4,4 +4,4 @@
 #   cargo install cargo-llvm-cov
 set -euo pipefail
 cd "$(dirname "$0")"
-exec cargo llvm-cov --all-targets --fail-under-lines 80 "$@"
+exec cargo llvm-cov --all-targets --fail-under-lines 90 "$@"

@@ -2,7 +2,7 @@
 
 Part of [rust-cfs-bridge](https://github.com/GokServis/rust-cfs-bridge).
 
-Web UI for the **rust-cfs-bridge** stack. It loads the command dictionary from **`bridge-server`** (`GET /api/commands`) and sends JSON bodies to **`POST /api/send`**. The server turns that JSON into CCSDS wire format and UDP to CI_LAB; see [rust-bridge/README.md](../rust-bridge/README.md).
+Web UI for the **rust-cfs-bridge** stack: **MobX** stores, **React Router** (`/` commands, `/telemetry` downlink), and **pure CSS** under `src/components/` (layout, command/telemetry screens, shared `ui/` primitives). It loads the command dictionary from **`bridge-server`** (`GET /api/commands`) and sends JSON to **`POST /api/send`**. Telemetry uses WebSocket **`/api/tlm/ws`** with a **bounded buffer**, **filters**, and **pagination** (`TelemetryStore`, `TelemetryLogTable`); see [docs/TELEMETRY.md](../docs/TELEMETRY.md). **Theme:** `data-theme` on `<html>` (dark default, toggle in header; persisted in `localStorage`).
 
 ## Which URL?
 
@@ -23,7 +23,7 @@ npm ci
 
 ## Development
 
-With **`bridge-server`** running (default `http://127.0.0.1:8080`), start Vite; it proxies **`/api`** to that host (see `vite.config.ts`).
+With **`bridge-server`** running (default `http://127.0.0.1:8080`), start Vite; it proxies **`/api`** to that host with **WebSocket upgrade** for telemetry (see `vite.config.ts`).
 
 ```bash
 npm run dev
@@ -43,11 +43,12 @@ Output is under **`dist/`**. Point **`bridge-server`** at it with **`BRIDGE_STAT
 
 ```bash
 npm run lint
+npm run lint:fix
 npm run test
 npm run test:coverage
 ```
 
-Coverage is enforced at **≥80% lines** on `src/` (see `vite.config.ts` and CI).
+Coverage is enforced at **≥90% lines** on `src/` (see `vite.config.ts` and CI).
 
 ## API contract
 

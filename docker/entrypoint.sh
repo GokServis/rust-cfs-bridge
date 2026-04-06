@@ -6,6 +6,7 @@ BRIDGE_SERVER=/app/rust-bridge/target/release/bridge-server
 CFS_LOG=/app/cfs-cpu1.log
 
 export BRIDGE_STATIC_DIR=/app/bridge-ui/dist
+export BRIDGE_TLM_BIND="${BRIDGE_TLM_BIND:-127.0.0.1:5001}"
 
 # Default msg_max (often 10) is too low for cFE Software Bus pipe depths; must run before core-cpu1.
 # Requires a privileged container (see docker-compose.yml) so this sysctl is writable.

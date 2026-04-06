@@ -1,0 +1,123 @@
+.telemetry-hero {
+  margin-bottom: 1.5rem;
+}
+
+.telemetry-hero__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.telemetry-hero__lede {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+  max-width: 42ch;
+  line-height: 1.55;
+}
+
+.telemetry-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.telemetry-metrics__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.82rem;
+}
+
+.telemetry-metrics__k {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.telemetry-metrics__v {
+  font-family: var(--mono);
+  color: var(--text-h);
+  font-size: 0.8rem;
+}
+
+.telemetry__stale {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.telemetry-grid {
+  margin-top: 1rem;
+}
+
+.telemetry-grid__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.telemetry-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.telemetry-dl__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) auto;
+  gap: 0.5rem 1rem;
+  font-size: 0.78rem;
+  align-items: baseline;
+}
+
+.telemetry-dl__row dt {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.telemetry-dl__row dd {
+  margin: 0;
+  font-family: var(--mono);
+  color: var(--text-h);
+  text-align: right;
+  word-break: break-word;
+}
+
+.telemetry-parse-error {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 2px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  font-size: 0.85rem;
+}
+
+.telemetry-hex {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: var(--mono);
+}
+
+.banner-telemetry-error {
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: 2px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.82rem;
+}
