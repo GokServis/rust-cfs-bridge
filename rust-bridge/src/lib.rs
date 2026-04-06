@@ -11,6 +11,86 @@ pub use udp::UdpSender;
 use serde::Deserialize;
 use thiserror::Error;
 
+// --- Mission ID mapping (cFS Software Bus vs CCSDS wire) ---
+/// cFS Software Bus MsgId for bridge packets (subscription / CI_LAB forward). **Not** placed in the CCSDS APID field.
+/// Must not use `0x1806` — that is `CFE_ES_CMD_MID` on default missions; use a free CMD topic (e.g. `0x18F0`).
+pub const BRIDGE_SB_MSGID_VALUE: u16 = 0x18F0;
+/// On-wire CCSDS primary-header APID (11 bits) for bridge dictionary commands.
+pub const BRIDGE_WIRE_APID: u16 = 0x006;
+
+/// Human-readable command name → payload rules and fixed wire APID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BridgeCommandSpec {
+    /// Always [`BRIDGE_WIRE_APID`] for current dictionary entries.
+    pub wire_apid: u16,
+    pub default_payload: &'static [u8],
+    pub payload_len: PayloadLenRule,
+}
+
+/// Allowed user payload sizes for a named command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PayloadLenRule {
+    Exact(usize),
+    Range { min: usize, max: usize },
+}
+
+impl BridgeCommandSpec {
+    /// Built-in dictionary: heartbeat telecommand (3-byte payload, 11-byte wire with CRC).
+    pub const CMD_HEARTBEAT: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID,
+        default_payload: &[0xC0, 0xFF, 0xEE],
+        payload_len: PayloadLenRule::Exact(3),
+    };
+
+    fn validate_payload_len(&self, command_name: &str, len: usize) -> Result<(), BridgeError> {
+        match self.payload_len {
+            PayloadLenRule::Exact(n) if len == n => Ok(()),
+            PayloadLenRule::Exact(n) => Err(BridgeError::PayloadConstraint {
+                command: command_name.to_string(),
+                expected: n,
+                got: len,
+            }),
+            PayloadLenRule::Range { min, max } if (min..=max).contains(&len) => Ok(()),
+            PayloadLenRule::Range { min, max } => {
+                Err(BridgeError::PayloadConstraintRange { min, max, got: len })
+            }
+        }
+    }
+}
+
+/// Resolves a command name to a [`SpaceCommand`] using the static dictionary.
+pub fn command_dictionary_resolve(
+    name: &str,
+    sequence_count: u16,
+    payload_override: Option<Vec<u8>>,
+) -> Result<SpaceCommand, BridgeError> {
+    let spec = match name {
+        "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
+        _ => return Err(BridgeError::UnknownCommand(name.to_string())),
+    };
+
+    if sequence_count > 0x3FFF {
+        return Err(BridgeError::SequenceCountOutOfRange(sequence_count));
+    }
+
+    let payload = match payload_override {
+        Some(p) => {
+            spec.validate_payload_len(name, p.len())?;
+            p
+        }
+        None => {
+            spec.validate_payload_len(name, spec.default_payload.len())?;
+            spec.default_payload.to_vec()
+        }
+    };
+
+    Ok(SpaceCommand {
+        apid: spec.wire_apid,
+        sequence_count,
+        payload,
+    })
+}
+
 /// CRC-16/CCITT-FALSE over `data`.
 ///
 /// Parameters: width 16, poly `0x1021`, init `0xFFFF`, no refin/refout, xorout `0`.
@@ -37,6 +117,25 @@ pub struct SpaceCommand {
     pub sequence_count: u16,
     #[serde(deserialize_with = "deserialize_hex_payload")]
     pub payload: Vec<u8>,
+}
+
+/// JSON shape: either a dictionary command name or legacy `apid` + hex `payload`.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum CommandJson {
+    Named {
+        command: String,
+        #[serde(default)]
+        sequence_count: u16,
+        #[serde(default)]
+        payload: Option<String>,
+    },
+    Legacy {
+        apid: u16,
+        sequence_count: u16,
+        #[serde(deserialize_with = "deserialize_hex_payload")]
+        payload: Vec<u8>,
+    },
 }
 
 fn deserialize_hex_payload<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -75,6 +174,16 @@ fn hex_val(b: u8) -> Result<u8, String> {
 
 #[derive(Debug, Error)]
 pub enum BridgeError {
+    #[error("unknown command: {0}")]
+    UnknownCommand(String),
+    #[error("payload length invalid for {command}: expected {expected} bytes, got {got}")]
+    PayloadConstraint {
+        command: String,
+        expected: usize,
+        got: usize,
+    },
+    #[error("payload length invalid: expected {min}..={max} bytes, got {got}")]
+    PayloadConstraintRange { min: usize, max: usize, got: usize },
     #[error("APID must be <= 0x7FF (got {0})")]
     ApidOutOfRange(u16),
     #[error("sequence count must be <= 0x3FFF (got {0})")]
@@ -87,6 +196,8 @@ pub enum BridgeError {
     ChecksumMismatch { expected: u16, got: u16 },
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("hex payload: {0}")]
+    HexPayload(String),
 }
 
 /// CCSDS space packet primary header fields, payload, and expected CRC (from wire or validation).
@@ -230,8 +341,32 @@ fn payload_len_from_data_length_field(field: u16) -> usize {
 }
 
 impl SpaceCommand {
+    /// Parses JSON: legacy `{ "apid", "sequence_count", "payload" (hex) }` or
+    /// `{ "command": "CMD_HEARTBEAT", "sequence_count"?, "payload"? (hex) }`.
     pub fn from_json(s: &str) -> Result<Self, BridgeError> {
-        Ok(serde_json::from_str(s)?)
+        let j: CommandJson = serde_json::from_str(s)?;
+        match j {
+            CommandJson::Named {
+                command,
+                sequence_count,
+                payload,
+            } => {
+                let override_bytes = match payload {
+                    None => None,
+                    Some(hex) => Some(decode_hex(&hex).map_err(BridgeError::HexPayload)?),
+                };
+                command_dictionary_resolve(&command, sequence_count, override_bytes)
+            }
+            CommandJson::Legacy {
+                apid,
+                sequence_count,
+                payload,
+            } => Ok(Self {
+                apid,
+                sequence_count,
+                payload,
+            }),
+        }
     }
 }
 
@@ -477,5 +612,56 @@ mod tests {
         let back = CcsdsPacket::from_bytes(&wire).unwrap();
         assert!(back.payload.is_empty());
         assert_eq!(back.apid, 0);
+    }
+
+    #[test]
+    fn dictionary_cmd_heartbeat_maps_to_wire_apid_and_crc() {
+        let cmd = command_dictionary_resolve("CMD_HEARTBEAT", 0, None).unwrap();
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID);
+        assert_eq!(cmd.payload, vec![0xC0, 0xFF, 0xEE]);
+        let pkt = CcsdsPacket::from_command(&cmd).unwrap();
+        let wire = pkt.to_bytes();
+        assert_eq!(wire.len(), 11);
+        let crc = compute_crc16_ccitt(&wire[..9]);
+        assert_eq!(wire[9..11], crc.to_be_bytes());
+    }
+
+    #[test]
+    fn sb_msgid_constant_is_not_ccsds_apid_on_wire() {
+        // BRIDGE_SB_MSGID_VALUE is the cFS SB MsgId; the CCSDS header carries only 11-bit APID (here 0x006).
+        let cmd = command_dictionary_resolve("CMD_HEARTBEAT", 0, None).unwrap();
+        let pkt = CcsdsPacket::from_command(&cmd).unwrap();
+        let w0 = u16::from_be_bytes([pkt.primary_header_bytes()[0], pkt.primary_header_bytes()[1]]);
+        let apid_on_wire = w0 & 0x7FF;
+        assert_eq!(apid_on_wire, 0x006);
+        assert_ne!(apid_on_wire as u32, BRIDGE_SB_MSGID_VALUE as u32);
+    }
+
+    #[test]
+    fn dictionary_unknown_command_errors() {
+        let err = command_dictionary_resolve("CMD_UNKNOWN", 0, None).unwrap_err();
+        assert!(matches!(err, BridgeError::UnknownCommand(_)));
+    }
+
+    #[test]
+    fn dictionary_payload_wrong_length_errors() {
+        let err = command_dictionary_resolve("CMD_HEARTBEAT", 0, Some(vec![0x01])).unwrap_err();
+        assert!(matches!(err, BridgeError::PayloadConstraint { .. }));
+    }
+
+    #[test]
+    fn json_named_command_parses() {
+        let j = r#"{"command":"CMD_HEARTBEAT","sequence_count":0}"#;
+        let cmd = SpaceCommand::from_json(j).unwrap();
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID);
+        assert_eq!(cmd.payload, vec![0xC0, 0xFF, 0xEE]);
+    }
+
+    #[test]
+    fn json_named_command_with_hex_payload_override() {
+        let j = r#"{"command":"CMD_HEARTBEAT","sequence_count":1,"payload":"010203"}"#;
+        let cmd = SpaceCommand::from_json(j).unwrap();
+        assert_eq!(cmd.sequence_count, 1);
+        assert_eq!(cmd.payload, vec![1, 2, 3]);
     }
 }

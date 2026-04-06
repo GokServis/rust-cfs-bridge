@@ -5,8 +5,6 @@
 #   cd /app/rust-bridge && cargo build --release
 # Then: docker compose -f docker-compose.dev.yml up
 
-version: '3.8'
-
 services:
   space-bridge:
     build:
@@ -14,6 +12,7 @@ services:
       dockerfile: docker/Dockerfile
     container_name: rust-cfs-bridge-dev
     network_mode: "host"
+    privileged: true
     volumes:
       - .:/app
     stdin_open: true
