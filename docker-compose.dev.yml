@@ -1,19 +1,18 @@
 # Dev: bind-mounts the repo over /app so you can edit sources on the host.
 # Build artifacts must exist under the mounted tree (run once inside the container):
-#   docker compose -f docker-compose.dev.yml run --rm space-bridge bash
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm bridge-server bash
 #   cd /app/cfs && make BUILDTYPE=release prep && make && make install
 #   cd /app/rust-bridge && cargo build --release
-# Then: docker compose -f docker-compose.dev.yml up
+# Then: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 services:
-  space-bridge:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: rust-cfs-bridge-dev
-    network_mode: "host"
-    privileged: true
+  bridge-server:
+    container_name: rust-cfs-bridge-dev-server
     volumes:
       - .:/app
-    stdin_open: true
-    tty: true
+  bridge-ui:
+    container_name: rust-cfs-bridge-dev-ui
+  cfs:
+    container_name: rust-cfs-bridge-dev-cfs
+    volumes:
+      - .:/app

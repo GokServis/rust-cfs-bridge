@@ -12,7 +12,7 @@ describe('TelemetryOverview', () => {
     const store = new TelemetryStore()
     store.connected = false
     render(<TelemetryOverview store={store} />)
-    expect(screen.getByText('Offline')).toBeInTheDocument()
+    expect(screen.getAllByText('Offline')).toHaveLength(2)
   })
 
   it('renders ES HK fields when message present', () => {

@@ -1,0 +1,12 @@
+# SPA + nginx reverse proxy to bridge-server on host loopback :8081.
+FROM node:20-bookworm AS ui
+WORKDIR /app
+COPY bridge-ui/package.json bridge-ui/package-lock.json ./
+RUN npm ci
+COPY bridge-ui/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine
+COPY --from=ui /app/dist /usr/share/nginx/html
+COPY docker/nginx-bridge-ui.conf /etc/nginx/conf.d/default.conf
+EXPOSE 8080

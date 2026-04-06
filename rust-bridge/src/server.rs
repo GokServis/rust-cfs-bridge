@@ -38,6 +38,8 @@ pub struct SendResponse {
 pub enum ApiError {
     BadRequest(String),
     Io(String),
+    /// CI_LAB / UDP uplink target not reachable (e.g. cFS not running).
+    UpstreamUnavailable(String),
 }
 
 impl IntoResponse for ApiError {
@@ -45,10 +47,23 @@ impl IntoResponse for ApiError {
         let (status, msg) = match self {
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             ApiError::Io(m) => (StatusCode::INTERNAL_SERVER_ERROR, m),
+            ApiError::UpstreamUnavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m),
         };
         let body = Json(serde_json::json!({ "error": msg }));
         (status, body).into_response()
     }
+}
+
+fn map_udp_send_err(e: std::io::Error) -> ApiError {
+    let msg = e.to_string();
+    if e.kind() == std::io::ErrorKind::ConnectionRefused || msg.contains("Connection refused") {
+        let target =
+            std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
+        return ApiError::UpstreamUnavailable(format!(
+            "UDP target not reachable ({target}): CI_LAB is not listening. Start cFS with: docker compose --profile cfs up --build (or make up-cfs), or run a UDP sink on that port for testing."
+        ));
+    }
+    ApiError::Io(msg)
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -94,9 +109,7 @@ async fn send_json(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -112,9 +125,7 @@ async fn to_lab_output_enable(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -130,9 +141,7 @@ async fn to_lab_output_disable(
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
-    let n = guard
-        .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+    let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -193,7 +202,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let sender = UdpSender::connect(&udp_target)?;
     let (tlm_tx, _tlm_rx) = broadcast::channel::<TlmEvent>(256);
     let tlm_addr: std::net::SocketAddr = tlm_bind.parse()?;
-    tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener(
+    tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener_supervised(
         tlm_addr,
         tlm_tx.clone(),
     ));
@@ -399,6 +408,8 @@ mod tests {
         assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
         let io = ApiError::Io("disk".into()).into_response();
         assert_eq!(io.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let up = ApiError::UpstreamUnavailable("no ci_lab".into()).into_response();
+        assert_eq!(up.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test]

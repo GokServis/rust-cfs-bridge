@@ -7,9 +7,9 @@ This repository connects a **Rust HTTP/UDP bridge**, an optional **web UI**, and
 | Layer | Location | Role |
 |--------|----------|------|
 | **bridge-server** | `rust-bridge/` | Axum HTTP API (`/api`), builds wire packets, sends UDP to CI_LAB. |
-| **bridge-ui** | `bridge-ui/` | Static SPA (Vite build) served by `bridge-server` when `BRIDGE_STATIC_DIR` is set. |
+| **bridge-ui** | `bridge-ui/` | Static SPA (Vite build). With Compose, **nginx** serves **`dist/`** on **:8080** and proxies **`/api`** to **bridge-server** on **:8081**; legacy **`entrypoint.sh`** still serves the SPA from **`bridge-server`** when `BRIDGE_STATIC_DIR` is set. |
 | **cFS bundle** | `cfs/` (git submodule) | cFE, OSAL, PSP, lab apps (`ci_lab`, `to_lab`, …) and custom **bridge_reader**. |
-| **Docker image** | `docker/` | Builds cFS, Rust, and UI; entrypoint runs `core-cpu1` then `bridge-server`. |
+| **Docker** | `docker/` | Main **Dockerfile** builds cFS, Rust, and UI assets; **Dockerfile.bridge-ui** builds the nginx front end. Compose runs **bridge-server** + **bridge-ui** by default; **`cfs`** is optional (`--profile cfs`). |
 
 ## Repository layout
 
@@ -20,14 +20,13 @@ This repository connects a **Rust HTTP/UDP bridge**, an optional **web UI**, and
 
 ## Runtime (Docker / host)
 
-Compose uses **`network_mode: host`** so the bridge and CI_LAB share loopback UDP without extra port mapping. The entrypoint:
+Compose uses **`network_mode: host`** so the bridge and CI_LAB share loopback UDP without extra port mapping.
 
-1. Optionally raises **`fs.mqueue.msg_max`** (cFE Software Bus pipes use POSIX message queues; container needs **`privileged: true`** in compose).
-2. Starts **`core-cpu1`** from `cfs/build/exe/cpu1` (cFS expects to run from that directory).
-3. Waits briefly so CI_LAB and **bridge_reader** finish registration.
-4. Runs **`bridge-server`** with `BRIDGE_STATIC_DIR` pointing at the built UI.
+- **Default stack:** **bridge-server** listens on **`127.0.0.1:8081`** (HTTP + WebSocket); **nginx** (bridge-ui) listens on **`127.0.0.1:8080`** and proxies **`/api`** to the bridge.
+- **Optional `cfs` service** (`docker compose --profile cfs`): raises **`fs.mqueue.msg_max`** (**privileged**), runs **`core-cpu1`** from `cfs/build/exe/cpu1`.
+- **Legacy single-container** [`entrypoint.sh`](../docker/entrypoint.sh): starts **cFS** in the background, waits, then **`bridge-server`** with **`BRIDGE_STATIC_DIR`** (UI on **8080** in one process).
 
-Default HTTP bind: **`127.0.0.1:8080`**. Default UDP target: **`127.0.0.1:1234`** (CI_LAB listen port).
+Default **`BRIDGE_HTTP_BIND`** in Rust: **`127.0.0.1:8080`** if unset; Compose sets **8081** for **bridge-server**. Default UDP target: **`127.0.0.1:1234`** (CI_LAB listen port).
 
 ## cFS applications relevant to the bridge
 

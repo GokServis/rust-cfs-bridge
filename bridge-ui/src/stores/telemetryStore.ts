@@ -13,6 +13,9 @@ import type { TelemetryUiPrefsStore } from './telemetryUiPrefsStore'
 export const DEFAULT_TLM_BUFFER_CAP = 2000
 export const DEFAULT_TLM_PAGE_SIZE = 25
 
+/** Server `received_at` age above this shows Downlink Offline (when WebSocket is up). */
+export const DOWNLINK_STALE_MS = 5000
+
 function telemetryWsUrl(): string {
   const { protocol, host } = window.location
   const wsProto = protocol === 'https:' ? 'wss:' : 'ws:'
@@ -43,6 +46,9 @@ export class TelemetryStore {
   private prefs?: TelemetryUiPrefsStore
   private ws: WebSocket | null = null
   private nextSeq = 1
+  /** Refreshed while connected so downlink age updates without new packets. */
+  tickNowMs = 0
+  private tickTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(prefs?: TelemetryUiPrefsStore) {
     this.prefs = prefs
@@ -97,6 +103,38 @@ export class TelemetryStore {
     return pageSlice(this.filteredEntries, this.pageSize, this.effectivePageIndex)
   }
 
+  /** WebSocket to bridge-server is open. */
+  get bridgeLinkLive(): boolean {
+    return this.connected
+  }
+
+  /** Recent telemetry (any kind with `received_at`) within [`DOWNLINK_STALE_MS`]. */
+  get downlinkLive(): boolean {
+    if (!this.connected || !this.lastMessage) return false
+    const t = new Date(this.lastMessage.received_at).getTime()
+    if (Number.isNaN(t)) return false
+    return this.tickNowMs - t <= DOWNLINK_STALE_MS
+  }
+
+  private startTick(): void {
+    this.stopTick()
+    runInAction(() => {
+      this.tickNowMs = Date.now()
+    })
+    this.tickTimer = setInterval(() => {
+      runInAction(() => {
+        this.tickNowMs = Date.now()
+      })
+    }, 1000)
+  }
+
+  private stopTick(): void {
+    if (this.tickTimer != null) {
+      clearInterval(this.tickTimer)
+      this.tickTimer = null
+    }
+  }
+
   connect(): void {
     if (typeof window === 'undefined') return
     this.disconnect()
@@ -107,8 +145,10 @@ export class TelemetryStore {
         this.connected = true
         this.error = null
       })
+      this.startTick()
     }
     socket.onclose = () => {
+      this.stopTick()
       runInAction(() => {
         this.connected = false
         this.ws = null
@@ -151,6 +191,7 @@ export class TelemetryStore {
   }
 
   disconnect(): void {
+    this.stopTick()
     this.ws?.close()
     this.ws = null
     runInAction(() => {

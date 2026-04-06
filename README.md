@@ -13,12 +13,17 @@ docker compose build
 docker compose up
 ```
 
-Then open **`http://127.0.0.1:8080`**. More detail (Vite dev on **:5173**, image layout, dev compose): [docker/README.md](docker/README.md), [bridge-ui/README.md](bridge-ui/README.md).
+Then open **`http://127.0.0.1:8080`** (nginx serves the UI and proxies **`/api`** to **bridge-server** on **:8081**).
+
+**Uplink and TO_LAB commands need CI_LAB.** The default stack (**`docker compose up`** / **`make up`**) does **not** start cFS, so nothing listens on **`127.0.0.1:1234`** and command sends can fail with “UDP target not reachable”. For the full flight stack, use **`docker compose --profile cfs up --build`** or **`make up-cfs`**. Telemetry WebSocket and the UI still load without cFS; use **`scripts/mock_es_hk_udp.py`** to exercise downlink without cFS ([docs/TELEMETRY.md](docs/TELEMETRY.md)).
+
+More detail: [docker/README.md](docker/README.md), [bridge-ui/README.md](bridge-ui/README.md).
 
 | File | Role |
 |------|------|
-| `docker-compose.yml` | Default: baked image, no bind mount |
-| `docker-compose.dev.yml` | Bind-mount repo; build inside container ([docker/README.md](docker/README.md)) |
+| `docker-compose.yml` | **bridge-server** + **bridge-ui** (default); **`cfs`** with **`--profile cfs`** |
+| `docker-compose.dev.yml` | Merge with the file above: bind-mount **`.:/app`** for dev ([docker/README.md](docker/README.md)) |
+| `Makefile` | Shortcuts: **`make up`**, **`make up-cfs`**, **`make down`**, **`make logs-bridge`**, … |
 
 ## Repository
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Legacy monolith: cFS + bridge-server + static UI on one HTTP port (default 8080).
+# For Compose, prefer docker-compose.yml: bridge-server + bridge-ui (nginx) and optional --profile cfs.
 set -euo pipefail
 
 CFS_CPU1_DIR=/app/cfs/build/exe/cpu1
