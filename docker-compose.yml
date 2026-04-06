@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   space-bridge:
     build:
@@ -7,5 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: rust-cfs-bridge
     network_mode: "host"
+    # cFS SB pipes use POSIX mqueues; default fs.mqueue.msg_max is often 10 (too small for cFE).
+    # Privileged allows entrypoint.sh to raise msg_max in the container IPC namespace.
+    privileged: true
     stdin_open: true
     tty: true

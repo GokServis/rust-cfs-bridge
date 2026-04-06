@@ -21,12 +21,15 @@ COPY . .
 
 RUN chmod +x /app/docker/entrypoint.sh
 
+# `make prep` regenerates cfs/sample_defs; keep mission cpu1_cfe_es_startup.scr in sync with cfe/cmake/sample_defs.
 RUN cd cfs && \
     cp ./cfe/cmake/Makefile.sample Makefile && \
     cp -r ./cfe/cmake/sample_defs sample_defs && \
     make BUILDTYPE=release prep && \
+    cp ./cfe/cmake/sample_defs/cpu1_cfe_es_startup.scr ./sample_defs/cpu1_cfe_es_startup.scr && \
     make && \
-    make install
+    make install && \
+    cp ./cfe/cmake/sample_defs/cpu1_cfe_es_startup.scr ./build/exe/cpu1/cf/cfe_es_startup.scr
 
 RUN cd rust-bridge && cargo build --release
 
