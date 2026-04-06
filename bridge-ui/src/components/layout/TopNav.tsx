@@ -23,6 +23,9 @@ export const TopNav = observer(function TopNav() {
         <NavLink to="/telemetry" className={navClass}>
           Telemetry
         </NavLink>
+        <NavLink to="/dashboard" className={navClass}>
+          Dashboard
+        </NavLink>
       </nav>
       <div className="top-nav__actions">
         <button

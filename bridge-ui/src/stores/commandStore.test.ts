@@ -54,4 +54,51 @@ describe('CommandStore', () => {
     expect(store.sequenceCount).toBe(2)
     expect(store.payloadHex).toBe('00')
   })
+
+  describe('command history', () => {
+    it('history is empty initially', () => {
+      const store = new CommandStore()
+      expect(store.history).toEqual([])
+    })
+
+    it('appends a "sent" entry after a successful send', async () => {
+      const store = new CommandStore()
+      await store.load()
+      await store.send()
+      expect(store.history).toHaveLength(1)
+      const entry = store.history[0]
+      expect(entry.name).toBe('CMD_HEARTBEAT')
+      expect(entry.status).toBe('sent')
+      expect(entry.wireLength).toBe(11)
+      expect(typeof entry.sentAt).toBe('string')
+      expect(entry.sequenceCount).toBe(0)
+    })
+
+    it('appends a "rejected" entry when send throws', async () => {
+      vi.mocked(api.sendCommandJson).mockRejectedValueOnce(new Error('bad command'))
+      const store = new CommandStore()
+      await store.load()
+      await store.send()
+      expect(store.history).toHaveLength(1)
+      expect(store.history[0].status).toBe('rejected')
+    })
+
+    it('accumulates multiple sends in order', async () => {
+      const store = new CommandStore()
+      await store.load()
+      await store.send()
+      await store.send()
+      expect(store.history).toHaveLength(2)
+      expect(store.history[0].sequenceCount).toBe(0)
+      expect(store.history[1].sequenceCount).toBe(0)
+    })
+
+    it('clearHistory empties the list', async () => {
+      const store = new CommandStore()
+      await store.load()
+      await store.send()
+      store.clearHistory()
+      expect(store.history).toHaveLength(0)
+    })
+  })
 })

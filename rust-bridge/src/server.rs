@@ -16,16 +16,28 @@ use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
-use crate::tlm::TlmEvent;
+use crate::tlm::{CommandAckResult, TlmEvent};
 use crate::{
     command_dictionary_entries, command_dictionary_resolve, CcsdsPacket, CommandMetadata,
     SpaceCommand, UdpSender,
 };
 
+/// A command waiting for HK confirmation.
+#[derive(Debug)]
+pub struct PendingCommand {
+    pub name: String,
+    pub sequence_count: u16,
+    pub sent_at: std::time::Instant,
+}
+
 /// Shared HTTP state (UDP sender to CI_LAB).
 pub struct AppState {
     pub udp: Mutex<UdpSender>,
     pub tlm_tx: broadcast::Sender<TlmEvent>,
+    /// Last command dispatched, waiting for round-trip confirmation via ES HK.
+    pub pending_cmd: tokio::sync::Mutex<Option<PendingCommand>>,
+    /// Last observed (cmd_counter, err_counter) from ES HK, used as baseline.
+    pub last_es_counters: tokio::sync::Mutex<(u8, u8)>,
 }
 
 #[derive(Debug, Serialize)]
@@ -105,11 +117,24 @@ async fn send_json(
 ) -> Result<Json<SendResponse>, ApiError> {
     let s = String::from_utf8(body.to_vec()).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let cmd = SpaceCommand::from_json(s.trim()).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    // Extract human-readable name: from "command" field for named commands, fallback to APID.
+    let cmd_name = serde_json::from_str::<serde_json::Value>(s.trim())
+        .ok()
+        .and_then(|v| v["command"].as_str().map(str::to_string))
+        .unwrap_or_else(|| format!("apid:{:#05x}", cmd.apid));
+    let seq = cmd.sequence_count;
     let packet =
         CcsdsPacket::from_command(&cmd).map_err(|e| ApiError::BadRequest(e.to_string()))?;
     let wire_len = 6 + packet.payload.len() + 2;
     let guard = state.udp.lock().await;
     let n = guard.send_packet(&packet).map_err(map_udp_send_err)?;
+    drop(guard);
+    // Record as pending for command verification (overwrites any prior pending).
+    *state.pending_cmd.lock().await = Some(PendingCommand {
+        name: cmd_name,
+        sequence_count: seq,
+        sent_at: std::time::Instant::now(),
+    });
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -160,6 +185,48 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
+/// Subscribes to the broadcast channel and emits `CommandAck` events when
+/// pending commands are confirmed or rejected via ES HK counter changes.
+pub async fn run_command_verifier(state: Arc<AppState>) {
+    let mut rx = state.tlm_tx.subscribe();
+    loop {
+        match rx.recv().await {
+            Ok(TlmEvent::EsHkV1 {
+                es_hk, received_at, ..
+            }) => {
+                let mut last = state.last_es_counters.lock().await;
+                let (prev_cmd, prev_err) = *last;
+                *last = (es_hk.command_counter, es_hk.command_error_counter);
+                drop(last);
+
+                let mut pending = state.pending_cmd.lock().await;
+                if let Some(entry) = pending.take() {
+                    let result = if es_hk.command_error_counter > prev_err {
+                        CommandAckResult::Rejected
+                    } else if es_hk.command_counter > prev_cmd {
+                        CommandAckResult::Accepted
+                    } else {
+                        // Counters unchanged — command not yet processed; keep waiting.
+                        *pending = Some(entry);
+                        continue;
+                    };
+                    let latency_ms = entry.sent_at.elapsed().as_millis() as u64;
+                    let _ = state.tlm_tx.send(TlmEvent::CommandAck {
+                        received_at,
+                        name: entry.name,
+                        sequence_count: entry.sequence_count,
+                        result,
+                        latency_ms,
+                    });
+                }
+            }
+            Ok(_) => {}
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Closed) => break,
+        }
+    }
+}
+
 /// Full application: `/api/*` JSON API, optional SPA fallback from `static_dir`.
 pub fn build_app(
     sender: UdpSender,
@@ -169,6 +236,8 @@ pub fn build_app(
     let state = Arc::new(AppState {
         udp: Mutex::new(sender),
         tlm_tx,
+        pending_cmd: tokio::sync::Mutex::new(None),
+        last_es_counters: tokio::sync::Mutex::new((0, 0)),
     });
     let api = api_router(state.clone());
 
@@ -185,6 +254,7 @@ pub fn build_app(
         app = app
             .route_service("/", get_service(ServeFile::new(index.clone())))
             .route_service("/telemetry", get_service(ServeFile::new(index.clone())))
+            .route_service("/dashboard", get_service(ServeFile::new(index.clone())))
             .fallback_service(static_svc);
     }
     app
@@ -202,11 +272,53 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let sender = UdpSender::connect(&udp_target)?;
     let (tlm_tx, _tlm_rx) = broadcast::channel::<TlmEvent>(256);
     let tlm_addr: std::net::SocketAddr = tlm_bind.parse()?;
+
+    // Optional JSONL persistence: enabled when BRIDGE_JOURNAL_DIR is set.
+    let journal = std::env::var("BRIDGE_JOURNAL_DIR").ok().map(|dir| {
+        let path = std::path::PathBuf::from(dir);
+        eprintln!("bridge-server: telemetry journal writing to {path:?}");
+        crate::persistence::spawn_journal_writer(path)
+    });
+
+    let app_state = Arc::new(AppState {
+        udp: Mutex::new(sender),
+        tlm_tx: tlm_tx.clone(),
+        pending_cmd: tokio::sync::Mutex::new(None),
+        last_es_counters: tokio::sync::Mutex::new((0, 0)),
+    });
+
     tokio::spawn(crate::tlm::udp_task::run_udp_telemetry_listener_supervised(
         tlm_addr,
         tlm_tx.clone(),
+        journal,
     ));
-    let app = build_app(sender, tlm_tx, static_dir.as_deref());
+    tokio::spawn(run_command_verifier(app_state.clone()));
+
+    let api = api_router(app_state.clone());
+    let mut app = Router::new()
+        .nest("/api", api)
+        .route("/health", get(health))
+        .layer(CorsLayer::permissive());
+
+    if let Some(ref root) = static_dir {
+        let index = format!("{}/index.html", root.trim_end_matches('/'));
+        let static_svc = tower_http::services::ServeDir::new(root)
+            .not_found_service(tower_http::services::ServeFile::new(index.clone()));
+        app = app
+            .route_service(
+                "/",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
+            .route_service(
+                "/telemetry",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
+            .route_service(
+                "/dashboard",
+                axum::routing::get_service(tower_http::services::ServeFile::new(index.clone())),
+            )
+            .fallback_service(static_svc);
+    }
 
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     eprintln!("bridge-server: listening on http://{bind} (UDP to {udp_target}, telemetry UDP on {tlm_bind})");

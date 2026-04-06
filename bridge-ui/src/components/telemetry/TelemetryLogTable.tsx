@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite'
 
 import type { TelemetryStore } from '../../stores/telemetryStore'
-import { apidOf, summaryLine } from '../../telemetryFiltering'
+import { apidOf, rawLenOf, summaryLine } from '../../telemetryFiltering'
 import { Button } from '../ui/Button'
 import { Panel } from '../ui/Panel'
 
@@ -126,6 +126,7 @@ export const TelemetryLogTable = observer(function TelemetryLogTable({
               pagedEntries.map((row) => {
                 const m = row.message
                 const apid = apidOf(m)
+                const rawLen = rawLenOf(m)
                 return (
                   <tr key={row.seq}>
                     <td>{row.seq}</td>
@@ -134,7 +135,7 @@ export const TelemetryLogTable = observer(function TelemetryLogTable({
                       <code>{m.kind}</code>
                     </td>
                     <td>{apid === null ? '—' : apid}</td>
-                    <td>{m.raw_len}</td>
+                    <td>{rawLen === null ? '—' : rawLen}</td>
                     <td className="telemetry-log__summary">{summaryLine(m)}</td>
                   </tr>
                 )

@@ -108,10 +108,9 @@ describe('TelemetryOverview', () => {
 
     fireEvent.click(disableBtn)
     await waitFor(() => expect(spy).toHaveBeenCalledWith(false))
-
-    // Even though lastToLabHk is still non-null, UI should show Off after successful disable.
-    const enableBtn = screen.getByRole('button', { name: 'Enable TO_LAB output' })
-    expect(enableBtn).toHaveTextContent('Off')
+    // Spy fires before React applies setToLabDesiredEnabled; wait for idle toggle UI.
+    const enableBtn = await screen.findByRole('button', { name: 'Enable TO_LAB output' })
+    await waitFor(() => expect(enableBtn).toHaveTextContent('Off'))
 
     fireEvent.click(enableBtn)
     await waitFor(() => expect(spy).toHaveBeenCalledWith(true))

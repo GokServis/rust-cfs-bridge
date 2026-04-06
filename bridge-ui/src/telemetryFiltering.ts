@@ -18,6 +18,10 @@ export function apidOf(msg: TlmMessage): number | null {
   return null
 }
 
+export function rawLenOf(msg: TlmMessage): number | null {
+  return 'raw_len' in msg ? msg.raw_len : null
+}
+
 export function summaryLine(msg: TlmMessage): string {
   if (msg.kind === 'es_hk_v1') {
     return `ES HK · cmd ${msg.es_hk.command_counter} · heap free ${msg.es_hk.heap_bytes_free}`
@@ -28,6 +32,9 @@ export function summaryLine(msg: TlmMessage): string {
   if (msg.kind === 'evs_long_event_v1') {
     const p = msg.evs_long_event.packet_id
     return `${p.app_name} · EVS ${p.event_id} · type ${p.event_type} · ${msg.evs_long_event.message}`
+  }
+  if (msg.kind === 'command_ack') {
+    return `CommandAck · ${msg.name} · seq ${msg.sequence_count} · ${msg.result} · ${msg.latency_ms} ms`
   }
   return msg.message
 }

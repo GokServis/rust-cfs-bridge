@@ -15,6 +15,16 @@ use crate::tlm::es_hk::{parse_es_hk_datagram, EsHkV1};
 use crate::tlm::evs_long_event::{parse_evs_long_event_datagram, EvsLongEventV1};
 use crate::tlm::to_lab_hk::{parse_to_lab_hk_datagram, ToLabHkV1};
 
+/// Outcome of a command verification round-trip.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandAckResult {
+    /// ES HK `command_counter` incremented — command accepted by cFS.
+    Accepted,
+    /// ES HK `command_error_counter` incremented — command rejected by cFS.
+    Rejected,
+}
+
 /// Wire JSON for WebSocket clients (`kind` discriminates schema).
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -43,6 +53,14 @@ pub enum TlmEvent {
         primary: Option<CcsdsPrimarySummary>,
         message: String,
         hex_preview: String,
+    },
+    /// Emitted by the command verifier when a pending command is confirmed or rejected.
+    CommandAck {
+        received_at: String,
+        name: String,
+        sequence_count: u16,
+        result: CommandAckResult,
+        latency_ms: u64,
     },
 }
 
@@ -171,6 +189,7 @@ mod tests {
             TlmEvent::ToLabHkV1 { .. } => panic!("unexpected TO_LAB HK"),
             TlmEvent::EvsLongEventV1 { .. } => panic!("unexpected EVS long event"),
             TlmEvent::ParseError { message, .. } => panic!("unexpected error: {message}"),
+            TlmEvent::CommandAck { .. } => panic!("unexpected CommandAck"),
         }
     }
 
@@ -186,7 +205,8 @@ mod tests {
             TlmEvent::ParseError { message, .. } => assert!(message.contains("length mismatch")),
             TlmEvent::EsHkV1 { .. }
             | TlmEvent::ToLabHkV1 { .. }
-            | TlmEvent::EvsLongEventV1 { .. } => {
+            | TlmEvent::EvsLongEventV1 { .. }
+            | TlmEvent::CommandAck { .. } => {
                 panic!("expected parse_error")
             }
         }

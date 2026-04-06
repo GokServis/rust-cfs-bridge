@@ -9,6 +9,8 @@ import { Panel } from '../ui/Panel'
 import { StatusBadge } from '../ui/StatusBadge'
 
 import { EsHkPanel } from './EsHkPanel'
+import { HeapChart } from './HeapChart'
+import { PacketRateChart } from './PacketRateChart'
 import { ParseErrorPanel } from './ParseErrorPanel'
 import { ToLabHkPanel } from './ToLabHkPanel'
 import { StaleWarning } from './StaleWarning'
@@ -152,6 +154,14 @@ export const TelemetryOverview = observer(function TelemetryOverview({
       </Panel>
 
       {lastMessage?.kind === 'parse_error' ? <ParseErrorPanel msg={lastMessage} /> : null}
+
+      <Panel title="Packet Rate (last 60 s)">
+        <PacketRateChart data={store.packetRateHistory} />
+      </Panel>
+
+      <Panel title="Heap Memory">
+        <HeapChart data={store.esHkHistory} />
+      </Panel>
     </div>
   )
 })

@@ -82,3 +82,11 @@ export type TlmMessage =
       message: string
       hex_preview: string
     }
+  | {
+      kind: 'command_ack'
+      received_at: string
+      name: string
+      sequence_count: number
+      result: 'accepted' | 'rejected'
+      latency_ms: number
+    }

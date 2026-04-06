@@ -1,3 +1,4 @@
+import { AlertStore } from './alertStore'
 import { CommandStore } from './commandStore'
 import { TelemetryStore } from './telemetryStore'
 import { ThemeStore } from './themeStore'
@@ -8,11 +9,13 @@ export class RootStore {
   command: CommandStore
   telemetry: TelemetryStore
   telemetryUiPrefs: TelemetryUiPrefsStore
+  alerts: AlertStore
 
   constructor() {
     this.theme = new ThemeStore()
     this.command = new CommandStore()
     this.telemetryUiPrefs = new TelemetryUiPrefsStore()
-    this.telemetry = new TelemetryStore(this.telemetryUiPrefs)
+    this.alerts = new AlertStore()
+    this.telemetry = new TelemetryStore(this.telemetryUiPrefs, this.alerts)
   }
 }
