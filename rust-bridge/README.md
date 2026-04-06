@@ -7,7 +7,7 @@ Rust library and binaries that send CCSDS-style packets to cFS over UDP (`std::n
 | Binary | Role |
 |--------|------|
 | `rust-bridge` | One-shot: sends a sample dictionary packet (default heartbeat) then exits (useful for smoke tests). |
-| `bridge-server` | Long-lived HTTP server: `GET /api/commands`, `POST /api/send`, `GET /api/health`; optional static UI when `BRIDGE_STATIC_DIR` points at a built [bridge-ui](../bridge-ui) `dist/` tree. |
+| `bridge-server` | Long-lived HTTP server: `GET /api/commands`, `POST /api/send`, `GET /api/health`; optional static UI when `BRIDGE_STATIC_DIR` points at a built [bridge-ui](../bridge-ui) `dist/` tree (see [bridge-ui/README.md](../bridge-ui/README.md)). |
 
 Environment variables for **`bridge-server`**:
 
@@ -71,7 +71,7 @@ The container entrypoint runs `bridge-server` after starting cFS `core-cpu1`, wi
 
 1. Start cFS (for example Docker) so CI_LAB listens on UDP **1234**.
 2. From `rust-bridge/`: `cargo run --release --bin bridge-server` (or `BRIDGE_UDP_TARGET=127.0.0.1:1234 cargo run --bin bridge-server`).
-3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080`.
+3. From `bridge-ui/`: `npm install && npm run dev` — Vite proxies `/api` to `http://127.0.0.1:8080`. Details: [bridge-ui/README.md](../bridge-ui/README.md).
 
 ## Pre-commit
 

@@ -11,7 +11,7 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
   - `make BUILDTYPE=release prep`
   - `make` and `make install`
 - **Environment for cFS:** `SIMULATION=native` (host 64-bit GCC on amd64), `OMIT_DEPRECATED=true`
-- **Node.js 20:** installed from NodeSource so **`bridge-ui`** can be built (`npm ci`, `npm run build` → `/app/bridge-ui/dist`).
+- **Node.js 20:** installed from NodeSource so **`bridge-ui`** can be built (`npm ci`, `npm run build` → `/app/bridge-ui/dist`). See [bridge-ui/README.md](../bridge-ui/README.md).
 - **Rust:** `cargo build --release` in `/app/rust-bridge` (produces **`bridge-server`** and the one-shot **`rust-bridge`** binary).
 
 ## Entrypoint

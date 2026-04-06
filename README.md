@@ -50,7 +50,7 @@ Upstream NASA repositories remain the conceptual baseline; these forks carry **b
 |------|---------|
 | `cfs/` | cFS bundle (submodule). Points at [macaris64/cFS](https://github.com/macaris64/cFS); nested submodules include **ci_lab** and **cfe** forks with bridge-related commits. Build with CMake/Make per cFS docs. |
 | `rust-bridge/` | Rust library and `bridge-server`; see [rust-bridge/README.md](rust-bridge/README.md). |
-| `bridge-ui/` | Web UI (Vite + React) that talks to `bridge-server` over `/api`. |
+| `bridge-ui/` | Web UI (Vite + React); see [bridge-ui/README.md](bridge-ui/README.md). |
 | `docker/` | Container image and entrypoint; see [docker/README.md](docker/README.md). |
 | `scripts/` | Helper scripts (for example [scripts/ensure-github-forks.sh](scripts/ensure-github-forks.sh) to fork upstream NASA repos via the GitHub API when `GITHUB_TOKEN` is set). |
 | `docker-compose.yml` | Production-style run: no bind mount, uses binaries baked into the image. |
@@ -87,6 +87,6 @@ For a **bind-mounted** working tree and rebuilding inside the container, use **`
 
 ## License
 
-Original files in this repository (for example Docker assets, Compose files, `rust-bridge/`, and documentation) are licensed under the [Apache License 2.0](LICENSE).
+Original files in this repository (for example Docker assets, Compose files, `rust-bridge/`, `bridge-ui/`, and documentation) are licensed under the [Apache License 2.0](LICENSE).
 
 The `cfs/` git submodule is third-party software; see [cfs/LICENSE](cfs/LICENSE) and the license files in submodule components for their terms.
