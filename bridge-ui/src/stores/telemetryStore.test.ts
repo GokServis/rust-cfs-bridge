@@ -2,6 +2,7 @@ import { waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TelemetryStore } from './telemetryStore'
+import { TelemetryUiPrefsStore } from './telemetryUiPrefsStore'
 
 class MockWebSocket {
   static sockets: MockWebSocket[] = []
@@ -61,6 +62,7 @@ const esPayload = {
 beforeEach(() => {
   MockWebSocket.sockets = []
   vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+  localStorage.clear()
 })
 
 afterEach(() => {
@@ -161,5 +163,27 @@ describe('TelemetryStore', () => {
     store.clearBuffer()
     expect(store.entries).toHaveLength(0)
     expect(store.pageIndex).toBe(0)
+  })
+
+  it('hydrates and persists filter prefs via TelemetryUiPrefsStore', () => {
+    localStorage.clear()
+    const prefs = new TelemetryUiPrefsStore()
+    prefs.setSnapshot({
+      kindFilter: 'parse_error',
+      apidFilter: '7',
+      searchText: 'heap',
+      pageSize: 50,
+      hideParseError: true,
+    })
+
+    const store = new TelemetryStore(prefs)
+    expect(store.kindFilter).toBe('parse_error')
+    expect(store.apidFilter).toBe('7')
+    expect(store.searchText).toBe('heap')
+    expect(store.pageSize).toBe(50)
+    expect(store.hideParseError).toBe(true)
+
+    store.setHideParseError(false)
+    expect(prefs.snapshot.hideParseError).toBe(false)
   })
 })

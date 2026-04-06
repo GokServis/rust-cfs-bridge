@@ -11,7 +11,7 @@
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `BRIDGE_TLM_BIND` | `127.0.0.1:5001` | UDP bind address for incoming telemetry |
+| `BRIDGE_TLM_BIND` | `127.0.0.1:2234` | UDP bind for incoming telemetry (matches default **`TO_LAB_MISSION_TLM_PORT`**) |
 | `BRIDGE_HTTP_BIND` | `127.0.0.1:8080` | HTTP + WebSocket bind |
 | `BRIDGE_UDP_TARGET` | `127.0.0.1:1234` | Uplink UDP target (CI_LAB) |
 
@@ -22,7 +22,8 @@ Docker: [entrypoint.sh](../docker/entrypoint.sh) sets `BRIDGE_TLM_BIND` if unset
 - **URL:** `ws://<host>:<port>/api/tlm/ws` (same host as the UI; Vite dev proxies `/api` with WebSocket upgrade).
 - **Messages:** one JSON object per telemetry datagram (tagged union, field `kind`):
   - `es_hk_v1` — parsed CFE Executive Services HK (Linux little-endian payload).
-  - `parse_error` — raw datagram could not be parsed as ES HK v1 (includes `hex_preview`).
+  - `to_lab_hk_v1` — parsed TO_LAB housekeeping (see [AVAILABLE_TELEMETRY.md](AVAILABLE_TELEMETRY.md)).
+  - `parse_error` — raw datagram did not match a known parser (includes `hex_preview`).
 
 ## Mock telemetry (no cFS changes)
 
@@ -31,7 +32,7 @@ From the repo root (Python 3):
 ```bash
 python3 scripts/mock_es_hk_udp.py
 # or
-python3 scripts/mock_es_hk_udp.py 127.0.0.1:5001
+python3 scripts/mock_es_hk_udp.py 127.0.0.1:2234
 ```
 
 Inside Docker (host network):
@@ -46,7 +47,7 @@ You should see the **Telemetry overview** and **telemetry log** (filters / pagin
 
 Use this after `docker compose build` and `docker compose up` on Linux with host networking ([docker/README.md](../docker/README.md)).
 
-1. **Container / bridge-server** — In `docker compose logs -f` (or stderr), confirm a line like **`telemetry UDP listening on`** `127.0.0.1:5001` (or your `BRIDGE_TLM_BIND`).
+1. **Container / bridge-server** — In `docker compose logs -f` (or stderr), confirm a line like **`telemetry UDP listening on`** `127.0.0.1:2234` (or your `BRIDGE_TLM_BIND`).
 2. **cFS** — Expect **core-cpu1** boot and **bridge_reader** subscription lines as in docker README; **`CI_LAB listening on UDP`** for uplink.
 3. **Downlink smoke test** — `docker exec -it rust-cfs-bridge python3 /app/scripts/mock_es_hk_udp.py` — open **`http://127.0.0.1:8080/telemetry`**: link **Live**, session packet count increases, **ES HK** panel and **log table** rows update.
 4. **Filters** — Change **Kind** / **APID** / **Search** and use **Previous** / **Next** on the log; **Clear buffer** empties stored rows (WebSocket stays connected).
@@ -63,12 +64,34 @@ BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/verify_uplink_dictionary.
 
 Confirm **bridge_reader** lines in `docker compose logs` or `/app/cfs-cpu1.log` match expected MsgId/APID (see [MESSAGE_FLOW.md](MESSAGE_FLOW.md)).
 
+## Live no-mock acceptance (optional)
+
+With **`docker compose up`** and **no** `mock_es_hk_udp.py`:
+
+1. Send **`CMD_TO_LAB_ENABLE_OUTPUT`** (e.g. `POST /api/send` with `{"command":"CMD_TO_LAB_ENABLE_OUTPUT","sequence_count":0}`).
+2. In **`docker compose logs`** or `docker exec rust-cfs-bridge grep -i 'telemetry output' /app/cfs-cpu1.log`, expect TO_LAB EVS text **`TO telemetry output enabled for IP`** (see `TO_LAB_EnableOutputCmd` in `to_lab_cmds.c`).
+3. On **`ws://127.0.0.1:8080/api/tlm/ws`**, expect JSON with **`kind`** **`es_hk_v1`** and/or **`to_lab_hk_v1`** once SCH/HK drives subscribed packets (may take tens of seconds).
+
+**Docker image:** the build applies [`docker/patches/sch_lab-hk-schedule.patch`](../docker/patches/sch_lab-hk-schedule.patch) so **SCH_LAB** requests **ES** and **TO_LAB** housekeeping (upstream `sch_lab` ships an empty schedule table otherwise). Without that patch, enable TO_LAB output but see no HK on UDP.
+
+Automated check:
+
+```bash
+python3 scripts/verify_live_telemetry_no_mock.py
+BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/verify_live_telemetry_no_mock.py
+python3 scripts/verify_live_telemetry_no_mock.py --check-docker-log
+python3 scripts/verify_live_telemetry_no_mock.py --check-docker-log --require-both
+```
+
+Use **`--require-both`** only if you need **`es_hk_v1`** and **`to_lab_hk_v1`** in one run (TO_LAB HK may lag or depend on mission parsers).
+
 ## Troubleshooting
 
 | Symptom | Check |
 |--------|--------|
 | UI shows “Disconnected” for telemetry | WebSocket blocked; ensure dev proxy has `ws: true` for `/api`. Same origin as HTTP. |
 | No UDP packets | Firewall; wrong `BRIDGE_TLM_BIND`; TO_LAB not sending (expected until configured). |
+| TO_LAB sends to wrong UDP port | Defaults use **2234** for both; if you change mission **`TO_LAB_MISSION_TLM_PORT`**, set **`BRIDGE_TLM_BIND`** to the same host:port. |
 | `parse_error` only | Datagram size/layout differs from ES HK v1 (12 + 168 bytes LE); compare mission headers. |
 | Logs | On start: `telemetry UDP listening on ...` from `bridge-server`. |
 

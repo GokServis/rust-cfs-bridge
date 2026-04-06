@@ -34,6 +34,24 @@ export interface EsHkPayload {
   heap_max_block_size: number
 }
 
+export interface ToLabHkPayload {
+  command_counter: number
+  command_error_counter: number
+}
+
+export interface EvsPacketIdPayload {
+  app_name: string
+  event_id: number
+  event_type: number
+  spacecraft_id: number
+  processor_id: number
+}
+
+export interface EvsLongEventPayload {
+  packet_id: EvsPacketIdPayload
+  message: string
+}
+
 export type TlmMessage =
   | {
       kind: 'es_hk_v1'
@@ -41,6 +59,20 @@ export type TlmMessage =
       raw_len: number
       primary: EsHkPrimary
       es_hk: EsHkPayload
+    }
+  | {
+      kind: 'to_lab_hk_v1'
+      received_at: string
+      raw_len: number
+      primary: EsHkPrimary
+      to_lab_hk: ToLabHkPayload
+    }
+  | {
+      kind: 'evs_long_event_v1'
+      received_at: string
+      raw_len: number
+      primary: EsHkPrimary
+      evs_long_event: EvsLongEventPayload
     }
   | {
       kind: 'parse_error'

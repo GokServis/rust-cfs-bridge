@@ -1,0 +1,33 @@
+.telemetry-screen {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 980px) {
+  .telemetry-screen {
+    grid-template-columns: minmax(22rem, 0.9fr) minmax(34rem, 1.4fr);
+    align-items: start;
+  }
+
+  .telemetry-screen__log {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.telemetry-screen__overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.telemetry-screen__log .telemetry-log {
+  margin-top: 0;
+}
+
+.telemetry-screen__log .telemetry-log__table-wrap {
+  max-height: min(62vh, 42rem);
+  overflow-y: auto;
+}
+

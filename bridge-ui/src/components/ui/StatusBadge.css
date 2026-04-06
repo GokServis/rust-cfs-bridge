@@ -14,13 +14,13 @@
 
 .ui-badge--ok {
   color: var(--ok);
-  border-color: rgba(74, 222, 128, 0.45);
+  border-color: var(--ok-border);
   background: var(--ok-bg);
 }
 
 .ui-badge--bad {
   color: var(--danger);
-  border-color: rgba(248, 113, 113, 0.45);
+  border-color: var(--danger-border);
   background: var(--danger-bg);
 }
 

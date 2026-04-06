@@ -14,6 +14,8 @@ html[data-theme='dark'] {
   --text-muted: #6b7280;
   --bg: #050508;
   --bg-elevated: #0c0c12;
+  --surface-input: rgba(0, 0, 0, 0.35);
+  --surface-table-header: rgba(0, 0, 0, 0.25);
   --border: rgba(56, 189, 248, 0.22);
   --border-dim: rgba(255, 255, 255, 0.06);
   --code-bg: rgba(0, 0, 0, 0.45);
@@ -22,8 +24,10 @@ html[data-theme='dark'] {
   --accent-glow: rgba(34, 211, 238, 0.35);
   --danger: #f87171;
   --danger-bg: rgba(248, 113, 113, 0.1);
+  --danger-border: rgba(248, 113, 113, 0.45);
   --ok: #4ade80;
   --ok-bg: rgba(74, 222, 128, 0.1);
+  --ok-border: rgba(74, 222, 128, 0.45);
   --shadow: 0 0 0 1px var(--border-dim), 0 24px 48px rgba(0, 0, 0, 0.55);
 }
 
@@ -34,6 +38,8 @@ html[data-theme='light'] {
   --text-muted: #6b7280;
   --bg: #f8fafc;
   --bg-elevated: #ffffff;
+  --surface-input: #ffffff;
+  --surface-table-header: rgba(241, 245, 249, 0.7);
   --border: rgba(14, 165, 233, 0.28);
   --border-dim: rgba(15, 23, 42, 0.08);
   --code-bg: #f1f5f9;
@@ -42,8 +48,10 @@ html[data-theme='light'] {
   --accent-glow: rgba(2, 132, 199, 0.25);
   --danger: #dc2626;
   --danger-bg: rgba(220, 38, 38, 0.08);
+  --danger-border: rgba(220, 38, 38, 0.35);
   --ok: #16a34a;
   --ok-bg: rgba(22, 163, 74, 0.1);
+  --ok-border: rgba(22, 163, 74, 0.35);
   --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.06);
 }
 

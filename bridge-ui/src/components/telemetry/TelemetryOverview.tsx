@@ -1,13 +1,16 @@
 import { observer } from 'mobx-react-lite'
+import { useMemo, useState } from 'react'
 
 import type { TelemetryStore } from '../../stores/telemetryStore'
 import type { TlmMessage } from '../../telemetryTypes'
+import { setToLabOutputEnabled } from '../../api'
 import { Card } from '../ui/Card'
 import { Panel } from '../ui/Panel'
 import { StatusBadge } from '../ui/StatusBadge'
 
 import { EsHkPanel } from './EsHkPanel'
 import { ParseErrorPanel } from './ParseErrorPanel'
+import { ToLabHkPanel } from './ToLabHkPanel'
 import { StaleWarning } from './StaleWarning'
 
 import './TelemetryOverview.css'
@@ -22,9 +25,18 @@ export const TelemetryOverview = observer(function TelemetryOverview({
 }: {
   store: TelemetryStore
 }) {
-  const { connected, lastReceivedAt, lastMessage, error, packetCount } = store
-  const msg = lastMessage
-  const serverTs = serverReceivedAt(msg)
+  const { connected, lastReceivedAt, lastMessage, lastEsHk, lastToLabHk, error, packetCount } =
+    store
+  const serverTs = serverReceivedAt(lastMessage)
+  const [toLabPending, setToLabPending] = useState(false)
+  const [toLabError, setToLabError] = useState<string | null>(null)
+
+  const inferredToLabEnabled = Boolean(lastToLabHk)
+  const [toLabDesiredEnabled, setToLabDesiredEnabled] = useState<boolean | null>(null)
+  const toLabEnabled = useMemo(
+    () => toLabDesiredEnabled ?? inferredToLabEnabled,
+    [toLabDesiredEnabled, inferredToLabEnabled],
+  )
 
   return (
     <div className="telemetry-overview">
@@ -58,6 +70,37 @@ export const TelemetryOverview = observer(function TelemetryOverview({
             <span className="telemetry-metrics__v">{serverTs ?? '—'}</span>
           </div>
         </div>
+        <div className="telemetry-metrics telemetry-metrics--controls">
+          <div className="telemetry-metrics__row">
+            <span className="telemetry-metrics__k">TO_LAB output</span>
+            <button
+              type="button"
+              className={`telemetry-toggle ${toLabEnabled ? 'telemetry-toggle--on' : 'telemetry-toggle--off'}`}
+              disabled={toLabPending}
+              onClick={async () => {
+                setToLabPending(true)
+                setToLabError(null)
+                const nextEnabled = !toLabEnabled
+                try {
+                  await setToLabOutputEnabled(nextEnabled)
+                  setToLabDesiredEnabled(nextEnabled)
+                } catch (e: unknown) {
+                  setToLabError(e instanceof Error ? e.message : 'TO_LAB toggle failed')
+                } finally {
+                  setToLabPending(false)
+                }
+              }}
+              aria-label={toLabEnabled ? 'Disable TO_LAB output' : 'Enable TO_LAB output'}
+            >
+              {toLabPending ? 'Working…' : toLabEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+        </div>
+        {toLabError ? (
+          <div className="banner-telemetry-error" role="alert">
+            {toLabError}
+          </div>
+        ) : null}
         {error ? (
           <div className="banner-telemetry-error" role="alert">
             {error}
@@ -66,12 +109,37 @@ export const TelemetryOverview = observer(function TelemetryOverview({
         <StaleWarning serverIso={serverTs} />
       </Card>
 
-      {msg?.kind === 'es_hk_v1' ? (
-        <Panel title="ES HK" className="telemetry-grid">
-          <EsHkPanel msg={msg} />
-        </Panel>
-      ) : null}
-      {msg?.kind === 'parse_error' ? <ParseErrorPanel msg={msg} /> : null}
+      <Panel title="ES HK" className="telemetry-grid">
+        {lastEsHk ? (
+          <EsHkPanel msg={lastEsHk} />
+        ) : (
+          <dl className="telemetry-dl">
+            <div className="telemetry-dl__row">
+              <dt>Status</dt>
+              <dd>—</dd>
+            </div>
+          </dl>
+        )}
+      </Panel>
+
+      <Panel title="TO_LAB HK" className="telemetry-grid">
+        {lastToLabHk ? (
+          <ToLabHkPanel msg={lastToLabHk} />
+        ) : (
+          <dl className="telemetry-dl">
+            <div className="telemetry-dl__row">
+              <dt>Command counter</dt>
+              <dd>—</dd>
+            </div>
+            <div className="telemetry-dl__row">
+              <dt>Command error counter</dt>
+              <dd>—</dd>
+            </div>
+          </dl>
+        )}
+      </Panel>
+
+      {lastMessage?.kind === 'parse_error' ? <ParseErrorPanel msg={lastMessage} /> : null}
     </div>
   )
 })

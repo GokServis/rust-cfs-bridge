@@ -14,6 +14,15 @@ pub async fn run_udp_telemetry_listener(
     tx: broadcast::Sender<TlmEvent>,
 ) -> Result<(), std::io::Error> {
     let socket = UdpSocket::bind(addr).await?;
+    run_udp_telemetry_loop(socket, tx).await
+}
+
+/// Forwards datagrams from an already-bound socket (used by tests with `127.0.0.1:0`).
+pub(crate) async fn run_udp_telemetry_loop(
+    socket: UdpSocket,
+    tx: broadcast::Sender<TlmEvent>,
+) -> Result<(), std::io::Error> {
+    let addr = socket.local_addr()?;
     eprintln!("bridge-server: telemetry UDP listening on {addr}");
     let mut buf = vec![0u8; 4096];
     loop {
@@ -21,5 +30,44 @@ pub async fn run_udp_telemetry_listener(
         let received_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         let event = classify_datagram(&buf[..n], received_at);
         let _ = tx.send(event);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tlm::es_hk::{CFE_TLM_HEADER_PREFIX_BYTES, ES_HK_PAYLOAD_BYTES};
+    use crate::tlm::TlmEvent;
+
+    #[tokio::test]
+    async fn forwards_datagram_to_broadcast() {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.expect("bind");
+        let addr = socket.local_addr().expect("addr");
+        let (tx, _) = broadcast::channel::<TlmEvent>(8);
+        let mut rx = tx.subscribe();
+        let h = tokio::spawn(run_udp_telemetry_loop(socket, tx));
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let total = CFE_TLM_HEADER_PREFIX_BYTES + ES_HK_PAYLOAD_BYTES;
+        let mut pkt = vec![0u8; total];
+        let user_len = total - 6;
+        let w2 = (user_len - 1) as u16;
+        pkt[0..2].copy_from_slice(&0x0800u16.to_be_bytes());
+        pkt[2..4].copy_from_slice(&0xc000u16.to_be_bytes());
+        pkt[4..6].copy_from_slice(&w2.to_be_bytes());
+        pkt[CFE_TLM_HEADER_PREFIX_BYTES] = 0x42;
+
+        let client = UdpSocket::bind("127.0.0.1:0").await.expect("client");
+        client.send_to(&pkt, addr).await.expect("send");
+
+        let ev = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .expect("timeout")
+            .expect("recv");
+        assert!(matches!(ev, TlmEvent::EsHkV1 { .. }));
+
+        h.abort();
+        let _ = h.await;
     }
 }

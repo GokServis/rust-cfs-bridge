@@ -5,12 +5,14 @@ on:
     paths:
       - "rust-bridge/**"
       - "bridge-ui/**"
+      - "scripts/**"
       - ".github/workflows/rust-bridge.yml"
       - ".pre-commit-config.yaml"
   pull_request:
     paths:
       - "rust-bridge/**"
       - "bridge-ui/**"
+      - "scripts/**"
       - ".github/workflows/rust-bridge.yml"
       - ".pre-commit-config.yaml"
 
@@ -22,6 +24,10 @@ jobs:
         working-directory: rust-bridge
     steps:
       - uses: actions/checkout@v4
+
+      - name: Python script syntax check
+        working-directory: ${{ github.workspace }}
+        run: python3 -m py_compile scripts/*.py
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -37,6 +43,35 @@ jobs:
 
       - name: cargo test
         run: cargo test
+
+      - name: Uplink dictionary integration (bridge-server + verify_uplink_dictionary.py)
+        working-directory: ${{ github.workspace }}
+        env:
+          BRIDGE_HTTP_BASE: http://127.0.0.1:8080
+        run: |
+          set -euo pipefail
+          cargo build --release --bin bridge-server --manifest-path rust-bridge/Cargo.toml
+          # Linux: UDP connect() to an unbound port yields ICMP unreachable; later sends get ECONNREFUSED.
+          # Absorb uplink datagrams so every dictionary POST succeeds (no real CI_LAB in CI).
+          python3 -c '
+          import socket
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.bind(("127.0.0.1", 1234))
+          while True:
+              s.recvfrom(65536)
+          ' &
+          SINK_PID=$!
+          ./rust-bridge/target/release/bridge-server &
+          PID=$!
+          trap 'kill ${PID} ${SINK_PID} 2>/dev/null || true; wait ${PID} 2>/dev/null || true; wait ${SINK_PID} 2>/dev/null || true' EXIT
+          for _ in $(seq 1 50); do
+            if curl -sf http://127.0.0.1:8080/api/health >/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          curl -sf http://127.0.0.1:8080/api/health >/dev/null
+          python3 scripts/verify_uplink_dictionary.py
 
       - name: Line coverage (all targets, minimum 90%)
         run: cargo llvm-cov --all-targets --fail-under-lines 90

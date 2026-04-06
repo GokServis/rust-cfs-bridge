@@ -31,8 +31,22 @@ pub const BRIDGE_SB_MSGID_VALUE: u16 = BRIDGE_SB_MSGID_HEARTBEAT;
 pub const BRIDGE_WIRE_APID_HEARTBEAT: u16 = 0x006;
 /// On-wire CCSDS APID for `CMD_PING`.
 pub const BRIDGE_WIRE_APID_PING: u16 = 0x007;
+/// On-wire CCSDS APID for `CMD_TO_LAB_ENABLE_OUTPUT` (CI_LAB → TO_LAB `EnableOutput`).
+pub const BRIDGE_WIRE_APID_TO_LAB_ENABLE_OUTPUT: u16 = 0x008;
+/// On-wire CCSDS APID for `CMD_TO_LAB_DISABLE_OUTPUT` (CI_LAB → TO_LAB `DisableOutput`).
+pub const BRIDGE_WIRE_APID_TO_LAB_DISABLE_OUTPUT: u16 = 0x009;
+/// TO_LAB command Software Bus MsgId (`0x1800 | 0x80`) — matches `TO_LAB_CMD_MID` in cFS.
+pub const TO_LAB_CMD_SB_MSGID: u16 = 0x1880;
 /// Legacy alias: same as [`BRIDGE_WIRE_APID_HEARTBEAT`].
 pub const BRIDGE_WIRE_APID: u16 = BRIDGE_WIRE_APID_HEARTBEAT;
+
+/// Default UDP bind for incoming telemetry. Align with cFS **`TO_LAB_MISSION_TLM_PORT`** (often **2234**) and `BRIDGE_TLM_BIND`.
+pub const BRIDGE_TLM_DEFAULT_BIND: &str = "127.0.0.1:2234";
+
+/// Default 16-byte `dest_IP` field for [`BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT`] (`127.0.0.1` NUL-padded).
+pub const CMD_TO_LAB_ENABLE_OUTPUT_DEFAULT_PAYLOAD: [u8; 16] = [
+    b'1', b'2', b'7', b'.', b'0', b'.', b'0', b'.', b'1', 0, 0, 0, 0, 0, 0, 0,
+];
 
 /// Human-readable command name → payload rules, wire APID, and matching SB MsgId (CI_LAB maps APID → MsgId).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +80,22 @@ impl BridgeCommandSpec {
         software_bus_msg_id: BRIDGE_SB_MSGID_PING,
         default_payload: &[0x50, 0x49, 0x4E],
         payload_len: PayloadLenRule::Exact(3),
+    };
+
+    /// TO_LAB `EnableOutput`: 16-byte destination IP string (NUL-padded) per `TO_LAB_EnableOutput_Payload_t`.
+    pub const CMD_TO_LAB_ENABLE_OUTPUT: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_TO_LAB_ENABLE_OUTPUT,
+        software_bus_msg_id: TO_LAB_CMD_SB_MSGID,
+        default_payload: &CMD_TO_LAB_ENABLE_OUTPUT_DEFAULT_PAYLOAD,
+        payload_len: PayloadLenRule::Exact(16),
+    };
+
+    /// TO_LAB `DisableOutput`: zero-byte payload. Stops TO_LAB telemetry forwarding.
+    pub const CMD_TO_LAB_DISABLE_OUTPUT: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_TO_LAB_DISABLE_OUTPUT,
+        software_bus_msg_id: TO_LAB_CMD_SB_MSGID,
+        default_payload: &[],
+        payload_len: PayloadLenRule::Exact(0),
     };
 
     fn validate_payload_len(&self, command_name: &str, len: usize) -> Result<(), BridgeError> {
@@ -143,6 +173,8 @@ pub fn command_dictionary_resolve(
     let spec = match name {
         "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
         "CMD_PING" => BridgeCommandSpec::CMD_PING,
+        "CMD_TO_LAB_ENABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT,
+        "CMD_TO_LAB_DISABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT,
         _ => return Err(BridgeError::UnknownCommand(name.to_string())),
     };
 
@@ -697,6 +729,11 @@ mod tests {
         assert_eq!(BridgeCommandSpec::CMD_HEARTBEAT.software_bus_msg_id, 0x18F0);
         assert_eq!(BridgeCommandSpec::CMD_PING.wire_apid, 0x007);
         assert_eq!(BridgeCommandSpec::CMD_PING.software_bus_msg_id, 0x18F1);
+        assert_eq!(BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.wire_apid, 0x008);
+        assert_eq!(
+            BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.software_bus_msg_id,
+            0x1880
+        );
     }
 
     #[test]
@@ -707,6 +744,7 @@ mod tests {
             let spec = match meta.name {
                 "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
                 "CMD_PING" => BridgeCommandSpec::CMD_PING,
+                "CMD_TO_LAB_ENABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT,
                 _ => panic!("unexpected dictionary name {}", meta.name),
             };
             assert_eq!(meta.software_bus_msg_id, spec.software_bus_msg_id);
@@ -788,5 +826,16 @@ mod tests {
         assert_eq!(e.len(), 2);
         assert!(e.iter().any(|c| c.name == "CMD_HEARTBEAT"));
         assert!(e.iter().any(|c| c.name == "CMD_PING"));
+        assert!(!e.iter().any(|c| c.name == "CMD_TO_LAB_ENABLE_OUTPUT"));
+    }
+
+    #[test]
+    fn dictionary_cmd_to_lab_enable_output_wire_length() {
+        let cmd = command_dictionary_resolve("CMD_TO_LAB_ENABLE_OUTPUT", 0, None).unwrap();
+        assert_eq!(cmd.apid, BRIDGE_WIRE_APID_TO_LAB_ENABLE_OUTPUT);
+        assert_eq!(cmd.payload.len(), 16);
+        let pkt = CcsdsPacket::from_command(&cmd).unwrap();
+        let wire = pkt.to_bytes();
+        assert_eq!(wire.len(), 24);
     }
 }

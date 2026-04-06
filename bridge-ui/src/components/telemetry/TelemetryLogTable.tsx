@@ -32,12 +32,16 @@ export const TelemetryLogTable = observer(function TelemetryLogTable({
           <select
             value={kindFilter}
             onChange={(e) =>
-              store.setKindFilter(e.target.value as 'all' | 'es_hk_v1' | 'parse_error')
+              store.setKindFilter(
+                e.target.value as 'all' | 'es_hk_v1' | 'to_lab_hk_v1' | 'evs_long_event_v1' | 'parse_error',
+              )
             }
             aria-label="Filter by packet kind"
           >
             <option value="all">All</option>
             <option value="es_hk_v1">es_hk_v1</option>
+            <option value="to_lab_hk_v1">to_lab_hk_v1</option>
+            <option value="evs_long_event_v1">evs_long_event_v1</option>
             <option value="parse_error">parse_error</option>
           </select>
         </label>
@@ -61,6 +65,17 @@ export const TelemetryLogTable = observer(function TelemetryLogTable({
             onChange={(e) => store.setSearchText(e.target.value)}
             aria-label="Search in telemetry JSON"
           />
+        </label>
+        <label className="telemetry-log__field">
+          <span className="telemetry-log__label">Parse errors</span>
+          <select
+            value={store.hideParseError ? 'hide' : 'show'}
+            onChange={(e) => store.setHideParseError(e.target.value === 'hide')}
+            aria-label="Parse error visibility"
+          >
+            <option value="show">Show</option>
+            <option value="hide">Hide</option>
+          </select>
         </label>
         <label className="telemetry-log__field">
           <span className="telemetry-log__label">Rows / page</span>
