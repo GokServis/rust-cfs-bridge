@@ -38,6 +38,8 @@ pub struct SendResponse {
 pub enum ApiError {
     BadRequest(String),
     Io(String),
+    /// CI_LAB / UDP uplink target not reachable (e.g. cFS not running).
+    UpstreamUnavailable(String),
 }
 
 impl IntoResponse for ApiError {
@@ -45,10 +47,22 @@ impl IntoResponse for ApiError {
         let (status, msg) = match self {
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             ApiError::Io(m) => (StatusCode::INTERNAL_SERVER_ERROR, m),
+            ApiError::UpstreamUnavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m),
         };
         let body = Json(serde_json::json!({ "error": msg }));
         (status, body).into_response()
     }
+}
+
+fn map_udp_send_err(e: std::io::Error) -> ApiError {
+    let msg = e.to_string();
+    if e.kind() == std::io::ErrorKind::ConnectionRefused || msg.contains("Connection refused") {
+        let target = std::env::var("BRIDGE_UDP_TARGET").unwrap_or_else(|_| "127.0.0.1:1234".to_string());
+        return ApiError::UpstreamUnavailable(format!(
+            "UDP target not reachable ({target}): CI_LAB is not listening. Start cFS with: docker compose --profile cfs up --build (or make up-cfs), or run a UDP sink on that port for testing."
+        ));
+    }
+    ApiError::Io(msg)
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -96,7 +110,7 @@ async fn send_json(
     let guard = state.udp.lock().await;
     let n = guard
         .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+        .map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -114,7 +128,7 @@ async fn to_lab_output_enable(
     let guard = state.udp.lock().await;
     let n = guard
         .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+        .map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -132,7 +146,7 @@ async fn to_lab_output_disable(
     let guard = state.udp.lock().await;
     let n = guard
         .send_packet(&packet)
-        .map_err(|e| ApiError::Io(e.to_string()))?;
+        .map_err(map_udp_send_err)?;
     Ok(Json(SendResponse {
         bytes_sent: n,
         wire_length: wire_len,
@@ -399,6 +413,8 @@ mod tests {
         assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
         let io = ApiError::Io("disk".into()).into_response();
         assert_eq!(io.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let up = ApiError::UpstreamUnavailable("no ci_lab".into()).into_response();
+        assert_eq!(up.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test]

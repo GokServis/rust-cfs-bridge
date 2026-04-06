@@ -89,6 +89,7 @@ Use **`--require-both`** only if you need **`es_hk_v1`** and **`to_lab_hk_v1`** 
 
 | Symptom | Check |
 |--------|--------|
+| **`Connection refused`** on **Send** or **TO_LAB** toggle | **CI_LAB** is not running on **`BRIDGE_UDP_TARGET`** (default **127.0.0.1:1234**). Start cFS: **`docker compose --profile cfs up`** / **`make up-cfs`**, or use a test UDP sink on that port. |
 | UI shows “Disconnected” for telemetry | WebSocket blocked; ensure dev proxy has `ws: true` for `/api`. Same origin as HTTP. |
 | No UDP packets | Firewall; wrong `BRIDGE_TLM_BIND`; TO_LAB not sending (expected until configured). |
 | TO_LAB sends to wrong UDP port | Defaults use **2234** for both; if you change mission **`TO_LAB_MISSION_TLM_PORT`**, set **`BRIDGE_TLM_BIND`** to the same host:port. |
