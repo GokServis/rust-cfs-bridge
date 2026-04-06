@@ -1,5 +1,8 @@
 /target/
 target/
+bridge-ui/node_modules/
+bridge-ui/dist/
+bridge-ui/coverage/
 **/*.rs.bk
 rust-toolchain
 rust-toolchain.toml
@@ -45,6 +48,9 @@ Release/
 x64/
 x86/
 [Bb]in/
+# Allow Rust binary sources (VS/Unity-style `bin/` dirs stay ignored elsewhere).
+!rust-bridge/src/bin/
+!rust-bridge/src/bin/**
 [Oo]bj/
 *.pdb
 

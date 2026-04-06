@@ -11,7 +11,8 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
   - `make BUILDTYPE=release prep`
   - `make` and `make install`
 - **Environment for cFS:** `SIMULATION=native` (host 64-bit GCC on amd64), `OMIT_DEPRECATED=true`
-- **Rust:** `cargo build --release` in `/app/rust-bridge`
+- **Node.js 20:** installed from NodeSource so **`bridge-ui`** can be built (`npm ci`, `npm run build` → `/app/bridge-ui/dist`).
+- **Rust:** `cargo build --release` in `/app/rust-bridge` (produces **`bridge-server`** and the one-shot **`rust-bridge`** binary).
 
 ## Entrypoint
 
@@ -21,7 +22,7 @@ Build context is the **repository root** (so `cfs/` and `rust-bridge/` are avail
 2. `cd /app/cfs/build/exe/cpu1`
 3. `./core-cpu1` in the background, with **stdout/stderr** copied to **`/app/cfs-cpu1.log`** via `tee` so logs are visible from `docker compose logs` as well as on disk in the container.
 4. **`sleep 2`** so CI_LAB and **bridge_reader** finish registration before the Rust bridge sends UDP.
-5. `exec /app/rust-bridge/target/release/rust-bridge` in the foreground.
+5. `exec /app/rust-bridge/target/release/bridge-server` in the foreground, with **`BRIDGE_STATIC_DIR=/app/bridge-ui/dist`** so the web UI is served on **http://127.0.0.1:8080** (API under **`/api`**). The process runs until **SIGINT** (for example **Ctrl+C** or `docker compose stop`).
 
 cFS expects to be started from `build/exe/cpu1` so it can find its startup script and loadable modules next to the executable.
 

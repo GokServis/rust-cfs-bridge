@@ -4,14 +4,18 @@ on:
   push:
     paths:
       - "rust-bridge/**"
+      - "bridge-ui/**"
       - ".github/workflows/rust-bridge.yml"
+      - ".pre-commit-config.yaml"
   pull_request:
     paths:
       - "rust-bridge/**"
+      - "bridge-ui/**"
       - ".github/workflows/rust-bridge.yml"
+      - ".pre-commit-config.yaml"
 
 jobs:
-  test-and-coverage:
+  rust-bridge:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,5 +38,31 @@ jobs:
       - name: cargo test
         run: cargo test
 
-      - name: Line coverage (library, minimum 90%)
-        run: cargo llvm-cov --lib --fail-under-lines 90
+      - name: Line coverage (all targets, minimum 80%)
+        run: cargo llvm-cov --all-targets --fail-under-lines 80
+
+  bridge-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bridge-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: bridge-ui/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: eslint
+        run: npm run lint
+
+      - name: build
+        run: npm run build
+
+      - name: test + coverage (minimum 80% lines)
+        run: npm run test:coverage

@@ -49,7 +49,8 @@ Upstream NASA repositories remain the conceptual baseline; these forks carry **b
 | Path | Purpose |
 |------|---------|
 | `cfs/` | cFS bundle (submodule). Points at [macaris64/cFS](https://github.com/macaris64/cFS); nested submodules include **ci_lab** and **cfe** forks with bridge-related commits. Build with CMake/Make per cFS docs. |
-| `rust-bridge/` | Rust binary; see [rust-bridge/README.md](rust-bridge/README.md). |
+| `rust-bridge/` | Rust library and `bridge-server`; see [rust-bridge/README.md](rust-bridge/README.md). |
+| `bridge-ui/` | Web UI (Vite + React) that talks to `bridge-server` over `/api`. |
 | `docker/` | Container image and entrypoint; see [docker/README.md](docker/README.md). |
 | `scripts/` | Helper scripts (for example [scripts/ensure-github-forks.sh](scripts/ensure-github-forks.sh) to fork upstream NASA repos via the GitHub API when `GITHUB_TOKEN` is set). |
 | `docker-compose.yml` | Production-style run: no bind mount, uses binaries baked into the image. |
@@ -70,9 +71,11 @@ docker compose build
 docker compose up
 ```
 
-**What this does:** The image builds cFS (`make prep`, `make`, `make install`) and `rust-bridge` (`cargo build --release`) from the submodule snapshot baked into the image—see [docker/Dockerfile](docker/Dockerfile) and [docker/README.md](docker/README.md). At runtime, [docker/entrypoint.sh](docker/entrypoint.sh) raises POSIX **mqueue** limits (needs **`privileged: true`** in Compose), starts **`core-cpu1`** from `cfs/build/exe/cpu1/`, streams its log to `/app/cfs-cpu1.log`, waits **2 seconds** for apps to register, then runs **`rust-bridge`**, which sends a UDP packet to **127.0.0.1:1234** (CI_LAB’s default port).
+**What this does:** The image builds cFS (`make prep`, `make`, `make install`), the **bridge-ui** static bundle (`npm ci && npm run build`), and **`rust-bridge`** (`cargo build --release`) from the tree baked into the image—see [docker/Dockerfile](docker/Dockerfile) and [docker/README.md](docker/README.md). At runtime, [docker/entrypoint.sh](docker/entrypoint.sh) raises POSIX **mqueue** limits (needs **`privileged: true`** in Compose), starts **`core-cpu1`** from `cfs/build/exe/cpu1/`, streams its log to `/app/cfs-cpu1.log`, waits **2 seconds** for apps to register, then runs **`bridge-server`**, which listens on **http://127.0.0.1:8080** (API under `/api`, UI from `/app/bridge-ui/dist`) and sends CCSDS UDP datagrams to **127.0.0.1:1234** (CI_LAB’s default port) when you use the UI or API.
 
-**What to look for in the logs:** cFS should pass Software Bus init without **`CFE_SB_CreatePipe`** / mqueue errors. You should see **bridge_reader** / **BRIDGE_READER** load and subscribe (for example MsgId **0x18F0**), then lines similar to **`rust-bridge: sent … bytes`** and **`Bridge Reader: Received valid packet`**. The container exits when the Rust binary finishes after sending.
+**What to look for in the logs:** cFS should pass Software Bus init without **`CFE_SB_CreatePipe`** / mqueue errors. You should see **bridge_reader** / **BRIDGE_READER** load and subscribe (for example MsgId **0x18F0**), then **`bridge-server: listening on http://…`**. Use **Send** in the browser or `POST /api/send` to trigger traffic; you should see **`Bridge Reader: Received valid packet`** (or similar) in the cFS log. The container keeps running until you stop it (**Ctrl+C**); **`bridge-server`** shuts down on SIGINT.
+
+**Optional:** Open **http://127.0.0.1:8080** on the host (with `network_mode: host`) to use the web UI.
 
 **Optional image tag:**
 

@@ -1,0 +1,44 @@
+# Install: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: local
+    hooks:
+      - id: rust-fmt
+        name: rust fmt
+        entry: bash -c 'cd rust-bridge && cargo fmt --all -- --check'
+        language: system
+        pass_filenames: false
+        files: ^rust-bridge/
+
+      - id: rust-clippy
+        name: rust clippy
+        entry: bash -c 'cd rust-bridge && cargo clippy --all-targets --all-features -- -D warnings'
+        language: system
+        pass_filenames: false
+        files: ^rust-bridge/
+
+      - id: rust-test
+        name: rust test
+        entry: bash -c 'cd rust-bridge && cargo test'
+        language: system
+        pass_filenames: false
+        files: ^rust-bridge/
+
+      - id: rust-coverage
+        name: rust llvm-cov (≥80% lines)
+        entry: bash -c 'cd rust-bridge && cargo llvm-cov --all-targets --fail-under-lines 80'
+        language: system
+        pass_filenames: false
+        files: ^rust-bridge/
+
+      - id: bridge-ui-ci
+        name: bridge-ui lint, build, test+coverage
+        entry: bash -c 'cd bridge-ui && npm ci && npm run lint && npm run build && npm run test:coverage'
+        language: system
+        pass_filenames: false
+        files: ^bridge-ui/

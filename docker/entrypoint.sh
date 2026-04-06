@@ -2,8 +2,10 @@
 set -euo pipefail
 
 CFS_CPU1_DIR=/app/cfs/build/exe/cpu1
-RUST_BRIDGE=/app/rust-bridge/target/release/rust-bridge
+BRIDGE_SERVER=/app/rust-bridge/target/release/bridge-server
 CFS_LOG=/app/cfs-cpu1.log
+
+export BRIDGE_STATIC_DIR=/app/bridge-ui/dist
 
 # Default msg_max (often 10) is too low for cFE Software Bus pipe depths; must run before core-cpu1.
 # Requires a privileged container (see docker-compose.yml) so this sysctl is writable.
@@ -18,4 +20,4 @@ cd "$CFS_CPU1_DIR"
 ./core-cpu1 2>&1 | tee "${CFS_LOG}" &
 # Allow CI_LAB and bridge_reader to finish startup before the first UDP datagram.
 sleep 2
-exec "$RUST_BRIDGE"
+exec "$BRIDGE_SERVER"

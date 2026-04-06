@@ -31,6 +31,12 @@ RUN cd cfs && \
     make install && \
     cp ./cfe/cmake/sample_defs/cpu1_cfe_es_startup.scr ./build/exe/cpu1/cf/cfe_es_startup.scr
 
+# Web UI (served by bridge-server from /app/bridge-ui/dist).
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/* && \
+    cd /app/bridge-ui && npm ci && npm run build
+
 RUN cd rust-bridge && cargo build --release
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
