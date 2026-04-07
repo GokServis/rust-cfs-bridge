@@ -1,4 +1,9 @@
 //! `CFE_ES_HousekeepingTlm_Payload` for mission `CFE_MISSION_ES_PERF_MAX_IDS == 128` (Linux LE).
+//!
+//! **Command counters:** Per cFE EDS, `CommandCounter` / `CommandErrorCounter` are the **ES
+//! application** command counters. Telecommands routed through CI_LAB to other apps (for example
+//! `CFE_TBL`) update those apps’ state and EVS — not ES HK. Do not use ES HK to acknowledge
+//! `CMD_CFE_TBL_*`; use EVS long events (CFE_TBL load lines, `AI_APP` validation success, etc.).
 
 use serde::Serialize;
 
@@ -10,8 +15,16 @@ const _: () = assert!(CFE_MISSION_ES_PERF_MAX_IDS / 32 == 4);
 /// Size of the HK payload only (after telemetry secondary header).
 pub const ES_HK_PAYLOAD_BYTES: usize = 168;
 
-/// Bytes before HK payload: 6-byte CCSDS primary + 6-byte cFE telemetry secondary (see cfe-es-hk-tlm.txt offsets).
-pub const CFE_TLM_HEADER_PREFIX_BYTES: usize = 12;
+/// Bytes before HK payload.
+///
+/// For this mission, the telemetry prefix is:
+/// - 6-byte CCSDS primary header
+/// - 2-byte SB MsgId
+/// - 8-byte time
+///
+/// Total 16 bytes prefix (matches EVS long event prefix and the observed ES HK datagram length:
+/// 168 payload + 16 prefix = 184).
+pub const CFE_TLM_HEADER_PREFIX_BYTES: usize = 16;
 
 /// Executive Services HK fields used by the dashboard (native-endian on Linux sim).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

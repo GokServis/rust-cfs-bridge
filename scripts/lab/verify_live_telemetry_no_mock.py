@@ -7,9 +7,9 @@ Requires: bridge-server + cFS (e.g. docker compose up), BRIDGE_TLM_BIND aligned 
 (default 127.0.0.1:2234). Sends CMD_TO_LAB_ENABLE_OUTPUT via POST /api/send.
 
 Usage:
-  python3 scripts/verify_live_telemetry_no_mock.py
-  BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/verify_live_telemetry_no_mock.py
-  python3 scripts/verify_live_telemetry_no_mock.py --check-docker-log
+  python3 scripts/lab/verify_live_telemetry_no_mock.py
+  BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/lab/verify_live_telemetry_no_mock.py
+  python3 scripts/lab/verify_live_telemetry_no_mock.py --check-docker-log
 """
 
 from __future__ import annotations

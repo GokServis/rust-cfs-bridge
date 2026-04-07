@@ -1,0 +1,75 @@
+name: scripts-integration
+
+on:
+  push:
+    paths:
+      - "scripts/**"
+      - "rust-bridge/**"
+      - ".github/workflows/scripts-integration.yml"
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "rust-bridge/**"
+      - ".github/workflows/scripts-integration.yml"
+
+jobs:
+  python-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile all Python under scripts/
+        run: |
+          set -euo pipefail
+          count=$(find scripts -name '*.py' | wc -l)
+          if [[ "$count" -eq 0 ]]; then
+            echo "No Python files under scripts/"
+            exit 1
+          fi
+          find scripts -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
+
+  shell-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n on shell scripts
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do
+            bash -n "$f"
+          done < <(find scripts -name '*.sh' -print0)
+
+  uplink-dictionary:
+    runs-on: ubuntu-latest
+    env:
+      BRIDGE_HTTP_BASE: http://127.0.0.1:8080
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build bridge-server and verify uplink dictionary
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cargo build --release --bin bridge-server --manifest-path rust-bridge/Cargo.toml
+          python3 -c '
+          import socket
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.bind(("127.0.0.1", 1234))
+          while True:
+              s.recvfrom(65536)
+          ' &
+          SINK_PID=$!
+          ./rust-bridge/target/release/bridge-server &
+          PID=$!
+          trap 'kill ${PID} ${SINK_PID} 2>/dev/null || true; wait ${PID} 2>/dev/null || true; wait ${SINK_PID} 2>/dev/null || true' EXIT
+          for _ in $(seq 1 50); do
+            if curl -sf http://127.0.0.1:8080/api/health >/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          curl -sf http://127.0.0.1:8080/api/health >/dev/null
+          python3 scripts/ci/verify_uplink_dictionary.py

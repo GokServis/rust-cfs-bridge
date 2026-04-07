@@ -16,13 +16,14 @@ use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
+use crate::brain_upload::{run_master_brain_upload, BrainUploadConfig};
 use crate::tlm::{CommandAckResult, TlmEvent};
 use crate::{
     command_dictionary_entries, command_dictionary_resolve, CcsdsPacket, CommandMetadata,
     SpaceCommand, UdpSender,
 };
 
-/// A command waiting for HK confirmation.
+/// A command waiting for HK confirmation (ES HK counters only — suitable for ES-targeted cmds).
 #[derive(Debug)]
 pub struct PendingCommand {
     pub name: String,
@@ -34,7 +35,7 @@ pub struct PendingCommand {
 pub struct AppState {
     pub udp: Mutex<UdpSender>,
     pub tlm_tx: broadcast::Sender<TlmEvent>,
-    /// Last command dispatched, waiting for round-trip confirmation via ES HK.
+    /// Last command dispatched for [`run_command_verifier`] (ES HK ack path — not used for CFE_TBL).
     pub pending_cmd: tokio::sync::Mutex<Option<PendingCommand>>,
     /// Last observed (cmd_counter, err_counter) from ES HK, used as baseline.
     pub last_es_counters: tokio::sync::Mutex<(u8, u8)>,
@@ -173,6 +174,19 @@ async fn to_lab_output_disable(
     }))
 }
 
+async fn brain_upload_start(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let cfg = BrainUploadConfig::default();
+    let state2 = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = run_master_brain_upload(cfg, state2).await {
+            eprintln!("brain_upload: FAILED: {e}");
+        }
+    });
+    Ok(Json(serde_json::json!({ "started": true })))
+}
+
 /// Builds the API router (nested under `/api` by [`build_app`]).
 pub fn api_router(state: Arc<AppState>) -> Router {
     Router::new()
@@ -181,12 +195,14 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/send", post(send_json))
         .route("/to_lab/output/enable", post(to_lab_output_enable))
         .route("/to_lab/output/disable", post(to_lab_output_disable))
+        .route("/brain/upload", post(brain_upload_start))
         .route("/tlm/ws", get(telemetry_ws))
         .with_state(state)
 }
 
-/// Subscribes to the broadcast channel and emits `CommandAck` events when
-/// pending commands are confirmed or rejected via ES HK counter changes.
+/// Subscribes to the broadcast channel and emits `CommandAck` when pending commands are
+/// reflected in **ES HK** counters. Commands handled only by other apps (e.g. CFE_TBL) must not
+/// rely on this path; use EVS-based completion instead.
 pub async fn run_command_verifier(state: Arc<AppState>) {
     let mut rx = state.tlm_tx.subscribe();
     loop {
@@ -363,10 +379,11 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).expect("json");
         let arr = v.as_array().expect("array");
-        assert_eq!(arr.len(), 2);
+        assert_eq!(arr.len(), 6);
         assert_eq!(arr[0]["name"], "CMD_HEARTBEAT");
         assert!(arr.iter().any(|e| e["name"] == "CMD_PING"));
-        assert!(!arr.iter().any(|e| e["name"] == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(arr.iter().any(|e| e["name"] == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(arr.iter().any(|e| e["name"] == "CMD_CFE_TBL_LOAD_FILE"));
     }
 
     #[tokio::test]

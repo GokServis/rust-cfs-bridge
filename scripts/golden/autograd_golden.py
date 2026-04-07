@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Emit C-style golden vectors for ai_app autograd unit tests.
-Matches microgpt Value semantics (scripts/microgpt.py).
+Matches microgpt Value semantics (scripts/reference/microgpt.py).
 """
 
 from __future__ import annotations

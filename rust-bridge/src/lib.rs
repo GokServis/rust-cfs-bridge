@@ -10,11 +10,18 @@ pub mod tlm;
 
 pub use tlm::TlmEvent;
 
+pub mod ai_app;
+
+pub mod cfdp;
+
 #[cfg(feature = "server")]
 pub mod persistence;
 
 #[cfg(feature = "server")]
 pub mod server;
+
+#[cfg(feature = "server")]
+pub mod brain_upload;
 
 pub use udp::UdpSender;
 
@@ -38,8 +45,14 @@ pub const BRIDGE_WIRE_APID_PING: u16 = 0x007;
 pub const BRIDGE_WIRE_APID_TO_LAB_ENABLE_OUTPUT: u16 = 0x008;
 /// On-wire CCSDS APID for `CMD_TO_LAB_DISABLE_OUTPUT` (CI_LAB → TO_LAB `DisableOutput`).
 pub const BRIDGE_WIRE_APID_TO_LAB_DISABLE_OUTPUT: u16 = 0x009;
+/// On-wire CCSDS APID for `CMD_CFE_TBL_LOAD_FILE` (CI_LAB → CFE_TBL `LOAD`).
+pub const BRIDGE_WIRE_APID_CFE_TBL_LOAD_FILE: u16 = 0x00A;
+/// On-wire CCSDS APID for `CMD_CFE_TBL_ACTIVATE` (CI_LAB → CFE_TBL `ACTIVATE`).
+pub const BRIDGE_WIRE_APID_CFE_TBL_ACTIVATE: u16 = 0x00B;
 /// TO_LAB command Software Bus MsgId (`0x1800 | 0x80`) — matches `TO_LAB_CMD_MID` in cFS.
 pub const TO_LAB_CMD_SB_MSGID: u16 = 0x1880;
+/// CFE_TBL command Software Bus MsgId (`0x1800 | 0x04`) — matches `CFE_TBL_CMD_MID` in cFS.
+pub const CFE_TBL_CMD_SB_MSGID: u16 = 0x1804;
 /// Legacy alias: same as [`BRIDGE_WIRE_APID_HEARTBEAT`].
 pub const BRIDGE_WIRE_APID: u16 = BRIDGE_WIRE_APID_HEARTBEAT;
 
@@ -50,6 +63,30 @@ pub const BRIDGE_TLM_DEFAULT_BIND: &str = "127.0.0.1:2234";
 pub const CMD_TO_LAB_ENABLE_OUTPUT_DEFAULT_PAYLOAD: [u8; 16] = [
     b'1', b'2', b'7', b'.', b'0', b'.', b'0', b'.', b'1', 0, 0, 0, 0, 0, 0, 0,
 ];
+
+/// Default `CFE_TBL_LoadCmd_Payload_t.LoadFilename` (CFE_MISSION_MAX_PATH_LEN == 64) NUL-padded.
+pub const CMD_CFE_TBL_LOAD_FILE_DEFAULT_PAYLOAD: [u8; 64] = {
+    let mut b = [0u8; 64];
+    let s = b"/cf/ai_app_weights.tbl";
+    let mut i = 0usize;
+    while i < s.len() && i < 64 {
+        b[i] = s[i];
+        i += 1;
+    }
+    b
+};
+
+/// Default `CFE_TBL_ActivateCmd_Payload_t.TableName` (CFE_MISSION_TBL_MAX_FULL_NAME_LEN == 40) NUL-padded.
+pub const CMD_CFE_TBL_ACTIVATE_DEFAULT_PAYLOAD: [u8; 40] = {
+    let mut b = [0u8; 40];
+    let s = b"AI_APP.WEIGHTS";
+    let mut i = 0usize;
+    while i < s.len() && i < 40 {
+        b[i] = s[i];
+        i += 1;
+    }
+    b
+};
 
 /// Human-readable command name → payload rules, wire APID, and matching SB MsgId (CI_LAB maps APID → MsgId).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,6 +136,22 @@ impl BridgeCommandSpec {
         software_bus_msg_id: TO_LAB_CMD_SB_MSGID,
         default_payload: &[],
         payload_len: PayloadLenRule::Exact(0),
+    };
+
+    /// CFE_TBL `LOAD`: payload is a fixed-size NUL-padded load filename (64 bytes).
+    pub const CMD_CFE_TBL_LOAD_FILE: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_CFE_TBL_LOAD_FILE,
+        software_bus_msg_id: CFE_TBL_CMD_SB_MSGID,
+        default_payload: &CMD_CFE_TBL_LOAD_FILE_DEFAULT_PAYLOAD,
+        payload_len: PayloadLenRule::Exact(64),
+    };
+
+    /// CFE_TBL `ACTIVATE`: payload is a fixed-size NUL-padded full table name (40 bytes).
+    pub const CMD_CFE_TBL_ACTIVATE: Self = Self {
+        wire_apid: BRIDGE_WIRE_APID_CFE_TBL_ACTIVATE,
+        software_bus_msg_id: CFE_TBL_CMD_SB_MSGID,
+        default_payload: &CMD_CFE_TBL_ACTIVATE_DEFAULT_PAYLOAD,
+        payload_len: PayloadLenRule::Exact(40),
     };
 
     fn validate_payload_len(&self, command_name: &str, len: usize) -> Result<(), BridgeError> {
@@ -164,6 +217,38 @@ pub fn command_dictionary_entries() -> Vec<CommandMetadata> {
             software_bus_msg_id: BridgeCommandSpec::CMD_PING.software_bus_msg_id,
             payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_PING.payload_len),
         },
+        CommandMetadata {
+            name: "CMD_TO_LAB_ENABLE_OUTPUT",
+            title: "TO_LAB EnableOutput",
+            description: "Enable TO_LAB telemetry forwarding by sending `EnableOutput` to TO_LAB via CI_LAB bridge ingest.",
+            wire_apid: BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.payload_len),
+        },
+        CommandMetadata {
+            name: "CMD_TO_LAB_DISABLE_OUTPUT",
+            title: "TO_LAB DisableOutput",
+            description: "Disable TO_LAB telemetry forwarding by sending `DisableOutput` to TO_LAB via CI_LAB bridge ingest.",
+            wire_apid: BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT.payload_len),
+        },
+        CommandMetadata {
+            name: "CMD_CFE_TBL_LOAD_FILE",
+            title: "CFE_TBL Load File",
+            description: "Load a table image from the cFS filesystem into an inactive buffer (CFE_TBL LOAD). Default is `/cf/ai_app_weights.tbl`.",
+            wire_apid: BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE.payload_len),
+        },
+        CommandMetadata {
+            name: "CMD_CFE_TBL_ACTIVATE",
+            title: "CFE_TBL Activate",
+            description: "Activate a previously-loaded table image (CFE_TBL ACTIVATE). Default is `AI_APP.WEIGHTS`.",
+            wire_apid: BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE.wire_apid,
+            software_bus_msg_id: BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE.software_bus_msg_id,
+            payload: PayloadConstraintJson::from_rule(BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE.payload_len),
+        },
     ]
 }
 
@@ -178,6 +263,8 @@ pub fn command_dictionary_resolve(
         "CMD_PING" => BridgeCommandSpec::CMD_PING,
         "CMD_TO_LAB_ENABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT,
         "CMD_TO_LAB_DISABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT,
+        "CMD_CFE_TBL_LOAD_FILE" => BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE,
+        "CMD_CFE_TBL_ACTIVATE" => BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE,
         _ => return Err(BridgeError::UnknownCommand(name.to_string())),
     };
 
@@ -737,6 +824,20 @@ mod tests {
             BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT.software_bus_msg_id,
             0x1880
         );
+        assert_eq!(
+            BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT.wire_apid,
+            0x009
+        );
+        assert_eq!(BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE.wire_apid, 0x00A);
+        assert_eq!(
+            BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE.software_bus_msg_id,
+            0x1804
+        );
+        assert_eq!(BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE.wire_apid, 0x00B);
+        assert_eq!(
+            BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE.software_bus_msg_id,
+            0x1804
+        );
     }
 
     #[test]
@@ -748,6 +849,9 @@ mod tests {
                 "CMD_HEARTBEAT" => BridgeCommandSpec::CMD_HEARTBEAT,
                 "CMD_PING" => BridgeCommandSpec::CMD_PING,
                 "CMD_TO_LAB_ENABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_ENABLE_OUTPUT,
+                "CMD_TO_LAB_DISABLE_OUTPUT" => BridgeCommandSpec::CMD_TO_LAB_DISABLE_OUTPUT,
+                "CMD_CFE_TBL_LOAD_FILE" => BridgeCommandSpec::CMD_CFE_TBL_LOAD_FILE,
+                "CMD_CFE_TBL_ACTIVATE" => BridgeCommandSpec::CMD_CFE_TBL_ACTIVATE,
                 _ => panic!("unexpected dictionary name {}", meta.name),
             };
             assert_eq!(meta.software_bus_msg_id, spec.software_bus_msg_id);
@@ -826,10 +930,11 @@ mod tests {
     #[test]
     fn command_dictionary_entries_includes_heartbeat_and_ping() {
         let e = command_dictionary_entries();
-        assert_eq!(e.len(), 2);
+        assert_eq!(e.len(), 6);
         assert!(e.iter().any(|c| c.name == "CMD_HEARTBEAT"));
         assert!(e.iter().any(|c| c.name == "CMD_PING"));
-        assert!(!e.iter().any(|c| c.name == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(e.iter().any(|c| c.name == "CMD_TO_LAB_ENABLE_OUTPUT"));
+        assert!(e.iter().any(|c| c.name == "CMD_CFE_TBL_LOAD_FILE"));
     }
 
     #[test]

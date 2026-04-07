@@ -30,15 +30,15 @@ Docker: [entrypoint-bridge.sh](../docker/entrypoint-bridge.sh) / [entrypoint.sh]
 From the repo root (Python 3):
 
 ```bash
-python3 scripts/mock_es_hk_udp.py
+python3 scripts/dev/mock_es_hk_udp.py
 # or
-python3 scripts/mock_es_hk_udp.py 127.0.0.1:2234
+python3 scripts/dev/mock_es_hk_udp.py 127.0.0.1:2234
 ```
 
 Inside Docker (host network; **bridge-server** container):
 
 ```bash
-docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py
+docker exec -it rust-cfs-bridge-server python3 /app/scripts/dev/mock_es_hk_udp.py
 ```
 
 You should see the **Telemetry overview** and **telemetry log** (filters / pagination) on **`/telemetry`** update, or JSON in a WebSocket client.
@@ -49,7 +49,7 @@ Use this after `docker compose build` and `docker compose up` on Linux with host
 
 1. **Container / bridge-server** — In `docker compose logs -f` (or stderr), confirm a line like **`telemetry UDP listening on`** `127.0.0.1:2234` (or your `BRIDGE_TLM_BIND`).
 2. **cFS** — Expect **core-cpu1** boot and **bridge_reader** subscription lines as in docker README; **`CI_LAB listening on UDP`** for uplink.
-3. **Downlink smoke test** — `docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py` — open **`http://127.0.0.1:8080/telemetry`**: **Bridge (API)** **Live**, **Downlink** **Live** after packets arrive, session packet count increases, **ES HK** panel and **log table** rows update.
+3. **Downlink smoke test** — `docker exec -it rust-cfs-bridge-server python3 /app/scripts/dev/mock_es_hk_udp.py` — open **`http://127.0.0.1:8080/telemetry`**: **Bridge (API)** **Live**, **Downlink** **Live** after packets arrive, session packet count increases, **ES HK** panel and **log table** rows update.
 4. **Filters** — Change **Kind** / **APID** / **Search** and use **Previous** / **Next** on the log; **Clear buffer** empties stored rows (WebSocket stays connected).
 5. **Uplink (optional)** — Send **CMD_HEARTBEAT** / **CMD_PING** from `/` and match **bridge_reader** MsgId/APID lines in logs ([MESSAGE_FLOW.md](MESSAGE_FLOW.md)).
 
@@ -58,8 +58,8 @@ Use this after `docker compose build` and `docker compose up` on Linux with host
 Sends every command from `GET /api/commands` through `POST /api/send`:
 
 ```bash
-python3 scripts/verify_uplink_dictionary.py
-BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/verify_uplink_dictionary.py
+python3 scripts/ci/verify_uplink_dictionary.py
+BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/ci/verify_uplink_dictionary.py
 ```
 
 Confirm **bridge_reader** lines in `docker compose logs` or `/app/cfs-cpu1.log` match expected MsgId/APID (see [MESSAGE_FLOW.md](MESSAGE_FLOW.md)).
@@ -77,10 +77,10 @@ With **`docker compose up`** and **no** `mock_es_hk_udp.py`:
 Automated check:
 
 ```bash
-python3 scripts/verify_live_telemetry_no_mock.py
-BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/verify_live_telemetry_no_mock.py
-python3 scripts/verify_live_telemetry_no_mock.py --check-docker-log
-python3 scripts/verify_live_telemetry_no_mock.py --check-docker-log --require-both
+python3 scripts/lab/verify_live_telemetry_no_mock.py
+BRIDGE_HTTP_BASE=http://127.0.0.1:8080 python3 scripts/lab/verify_live_telemetry_no_mock.py
+python3 scripts/lab/verify_live_telemetry_no_mock.py --check-docker-log
+python3 scripts/lab/verify_live_telemetry_no_mock.py --check-docker-log --require-both
 ```
 
 Use **`--require-both`** only if you need **`es_hk_v1`** and **`to_lab_hk_v1`** in one run (TO_LAB HK may lag or depend on mission parsers).

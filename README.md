@@ -15,7 +15,7 @@ docker compose up
 
 Then open **`http://127.0.0.1:8080`** (nginx serves the UI and proxies **`/api`** to **bridge-server** on **:8081**).
 
-**Uplink and TO_LAB commands need CI_LAB.** The default stack (**`docker compose up`** / **`make up`**) does **not** start cFS, so nothing listens on **`127.0.0.1:1234`** and command sends can fail with “UDP target not reachable”. For the full flight stack, use **`docker compose --profile cfs up --build`** or **`make up-cfs`**. Telemetry WebSocket and the UI still load without cFS; use **`scripts/mock_es_hk_udp.py`** to exercise downlink without cFS ([docs/TELEMETRY.md](docs/TELEMETRY.md)).
+**Uplink and TO_LAB commands need CI_LAB.** The default stack (**`docker compose up`** / **`make up`**) does **not** start cFS, so nothing listens on **`127.0.0.1:1234`** and command sends can fail with “UDP target not reachable”. For the full flight stack, use **`docker compose --profile cfs up --build`** or **`make up-cfs`**. Telemetry WebSocket and the UI still load without cFS; use **`scripts/dev/mock_es_hk_udp.py`** to exercise downlink without cFS ([docs/TELEMETRY.md](docs/TELEMETRY.md)).
 
 More detail: [docker/README.md](docker/README.md), [bridge-ui/README.md](bridge-ui/README.md).
 
@@ -33,11 +33,53 @@ More detail: [docker/README.md](docker/README.md), [bridge-ui/README.md](bridge-
 | [`rust-bridge/`](rust-bridge/README.md) | Rust library and `bridge-server` |
 | [`bridge-ui/`](bridge-ui/README.md) | Web UI |
 | [`docker/`](docker/README.md) | Dockerfile and runtime entrypoint |
-| [`scripts/`](scripts/) | Helpers: `mock_es_hk_udp.py`, `verify_uplink_dictionary.py`, [ensure-github-forks.sh](scripts/ensure-github-forks.sh) |
+| [`scripts/`](scripts/README.md) | CI, E2E, dev, and golden helpers ([`scripts/README.md`](scripts/README.md)) |
 | [`docs/TELEMETRY.md`](docs/TELEMETRY.md) | Telemetry UDP / WebSocket / troubleshooting |
 | [`docs/AVAILABLE_TELEMETRY.md`](docs/AVAILABLE_TELEMETRY.md) | cFS topic inventory, TO_LAB path, Rust parser matrix |
 
 If you already cloned without submodules: `git submodule update --init --recursive`. Remotes point at the [GokServis](https://github.com/GokServis) organization’s forks so commits are fetchable without NASA write access.
+
+## First full-loop “Brain Upload” test
+
+This runs the full sequence:
+- generate a deterministic `AI_APP.WEIGHTS` table image (`/cf/ai_app_weights.tbl`)
+- uplink via CFDP UDP **5235** (`udp_cfdp_ingest` → `CF`)
+- gate on **CF retained-file** EVS event + **CF EOT** telemetry
+- then issue `CFE_TBL` **LOAD** + **ACTIVATE** via CI_LAB UDP **1234**
+
+### Start the stack (includes cFS)
+
+```bash
+make up-cfs
+```
+
+### Run the upload driver (choose one)
+
+- **CLI driver** (runs once, exits):
+
+```bash
+cd rust-bridge
+cargo run --bin bridge_server -- brain-upload
+```
+
+- **HTTP driver** (kicks off a background job in `bridge-server`):
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8080/api/brain/upload"
+```
+
+### Watch for success (optional, log-based)
+
+```bash
+scripts/e2e/e2e_log_watcher.py --timeout 240
+```
+
+### Expected success signals
+
+- **CF retained-file gate**: `successfully retained file as /cf/ai_app_weights.tbl`
+- **CF EOT gate**: downlinked `cf_eot_v1` telemetry with `dst_filename == "/cf/ai_app_weights.tbl"`
+- **Table load/activate**: `command_ack` events for `CMD_CFE_TBL_LOAD_FILE` then `CMD_CFE_TBL_ACTIVATE` (accepted)
+- **No validation failure**: absence of `AI_APP weights table validation failed` EVS event
 
 ## License
 
