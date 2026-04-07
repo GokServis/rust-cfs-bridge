@@ -3,7 +3,11 @@
 # up      — bridge-server + nginx only (no cFS). Uplink UDP to CI_LAB (:1234) fails until cFS runs.
 # up-cfs  — same + core-cpu1 (CI_LAB / TO_LAB / bridge_reader).
 
-.PHONY: up up-cfs down logs-bridge logs-ui logs-cfs
+.PHONY: up up-cfs down logs-bridge logs-ui logs-cfs ai-app-ut
+
+# Host-side cFS ai_app math / SB list tests (no full cFS tree required)
+ai-app-ut:
+	$(MAKE) -C cfs/apps/ai_app/unit-test check
 
 up:
 	docker compose up --build
