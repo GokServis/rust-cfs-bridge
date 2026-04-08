@@ -1,5 +1,6 @@
 //! Telemetry ingestion: CCSDS primary header + CFE ES HK payload parsing (Linux LE).
 
+pub mod cf_eot;
 pub mod cfe_primary;
 pub mod es_hk;
 pub mod evs_long_event;
@@ -10,6 +11,7 @@ pub mod udp_task;
 
 use serde::Serialize;
 
+use crate::tlm::cf_eot::{parse_cf_eot_datagram, CfEotV1};
 use crate::tlm::cfe_primary::CcsdsPrimaryHeader;
 use crate::tlm::es_hk::{parse_es_hk_datagram, EsHkV1};
 use crate::tlm::evs_long_event::{parse_evs_long_event_datagram, EvsLongEventV1};
@@ -47,6 +49,12 @@ pub enum TlmEvent {
         primary: CcsdsPrimarySummary,
         evs_long_event: EvsLongEventV1,
     },
+    CfEotV1 {
+        received_at: String,
+        raw_len: usize,
+        primary: CcsdsPrimarySummary,
+        cf_eot: CfEotV1,
+    },
     ParseError {
         received_at: String,
         raw_len: usize,
@@ -61,6 +69,11 @@ pub enum TlmEvent {
         sequence_count: u16,
         result: CommandAckResult,
         latency_ms: u64,
+    },
+    BrainUploadProgress {
+        received_at: String,
+        step: String,
+        detail: String,
     },
 }
 
@@ -142,6 +155,20 @@ pub fn classify_datagram(data: &[u8], received_at: String) -> TlmEvent {
         };
     }
 
+    if let Some(eot) = parse_cf_eot_datagram(data) {
+        let primary = primary_summary.unwrap_or(CcsdsPrimarySummary {
+            apid: 0,
+            packet_type: 0,
+            sequence_count: 0,
+        });
+        return TlmEvent::CfEotV1 {
+            received_at,
+            raw_len,
+            primary,
+            cf_eot: eot,
+        };
+    }
+
     TlmEvent::ParseError {
         received_at,
         raw_len,
@@ -188,8 +215,10 @@ mod tests {
             TlmEvent::EsHkV1 { es_hk, .. } => assert_eq!(es_hk.command_counter, 0xAB),
             TlmEvent::ToLabHkV1 { .. } => panic!("unexpected TO_LAB HK"),
             TlmEvent::EvsLongEventV1 { .. } => panic!("unexpected EVS long event"),
+            TlmEvent::CfEotV1 { .. } => panic!("unexpected CF EOT"),
             TlmEvent::ParseError { message, .. } => panic!("unexpected error: {message}"),
             TlmEvent::CommandAck { .. } => panic!("unexpected CommandAck"),
+            TlmEvent::BrainUploadProgress { .. } => panic!("unexpected progress event"),
         }
     }
 
@@ -206,9 +235,11 @@ mod tests {
             TlmEvent::EsHkV1 { .. }
             | TlmEvent::ToLabHkV1 { .. }
             | TlmEvent::EvsLongEventV1 { .. }
+            | TlmEvent::CfEotV1 { .. }
             | TlmEvent::CommandAck { .. } => {
                 panic!("expected parse_error")
             }
+            TlmEvent::BrainUploadProgress { .. } => panic!("expected parse_error"),
         }
     }
 

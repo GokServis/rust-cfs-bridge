@@ -63,4 +63,4 @@ docker build -f docker/Dockerfile.bridge-ui -t rust-cfs-bridge-ui:local .
 
 Manual check: open **http://127.0.0.1:8080**, confirm commands and telemetry. With **cfs** running, send **CMD_HEARTBEAT** / **CMD_PING** and match **bridge_reader** lines in **`docker compose --profile cfs logs -f cfs`**.
 
-Telemetry mock (no cFS): `docker exec -it rust-cfs-bridge-server python3 /app/scripts/mock_es_hk_udp.py` — see [docs/TELEMETRY.md](../docs/TELEMETRY.md).
+Telemetry mock (no cFS): `docker exec -it rust-cfs-bridge-server python3 /app/scripts/dev/mock_es_hk_udp.py` — see [docs/TELEMETRY.md](../docs/TELEMETRY.md).

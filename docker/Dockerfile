@@ -20,8 +20,7 @@ WORKDIR /app
 
 COPY . .
 
-# Upstream sch_lab ships an empty schedule table; HK must be requested for TO_LAB to forward es_hk_v1 / to_lab_hk_v1.
-RUN patch -d /app/cfs/apps/sch_lab -p1 < /app/docker/patches/sch_lab-hk-schedule.patch
+# NOTE: `sch_lab` schedule table is maintained in-tree (no patch step).
 
 RUN chmod +x /app/docker/entrypoint.sh /app/docker/entrypoint-bridge.sh /app/docker/entrypoint-cfs.sh
 

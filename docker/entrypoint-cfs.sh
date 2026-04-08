@@ -12,5 +12,9 @@ if [[ -w /proc/sys/fs/mqueue/msg_max ]]; then
 fi
 
 cd "$CFS_CPU1_DIR"
+
+# Ensure host-mapped "cf" volume directories exist for CFDP RX temp/fail paths.
+mkdir -p ./cf/tmp ./cf/fail
+
 set -o pipefail
 ./core-cpu1 2>&1 | tee "${CFS_LOG}"
